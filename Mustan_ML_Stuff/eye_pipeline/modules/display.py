@@ -95,8 +95,20 @@ class DisplayWindow:
         Returns:
             bool: True if exit key was pressed
         """
-        key = cv2.waitKey(wait_time) & 0xFF
+        key = self.wait_key(wait_time)
         return key == 27 or key == ord('q')  # ESC or 'q'
+
+    def wait_key(self, wait_time=1):
+        """
+        Wait for a key press
+        
+        Args:
+            wait_time: Time to wait in milliseconds
+            
+        Returns:
+            int: ordinal of the pressed key
+        """
+        return cv2.waitKey(wait_time) & 0xFF
     
     def destroy(self):
         """Destroy the window and cleanup"""

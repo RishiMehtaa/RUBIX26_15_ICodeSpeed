@@ -45,6 +45,8 @@ def main():
     print("  - Vertical ratio > 0.15: Looking down (risk)")
     print("  - Horizontal ratio < 0.3 or > 0.7: Looking side (risk)")
     print("\nControls:")
+    print("  - Press 'c' to Calibrate (Look of center first!)")
+    print("  - Press 'r' to Reset Calibration")
     print("  - Press 'q' or ESC to quit")
     print("\nNote: Ensure best.pt is in eye_pipeline directory")
     print("="*70 + "\n")

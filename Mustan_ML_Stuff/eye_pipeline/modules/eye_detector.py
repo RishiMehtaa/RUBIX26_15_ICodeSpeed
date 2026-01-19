@@ -64,6 +64,11 @@ class EyeMovementDetector:
             'THINKING': (255, 165, 0) # Orange
         }
         
+        # Calibration state
+        self.is_calibrated = False
+        self.should_calibrate = False
+        self.calibration_offsets = {}  # {'Left': 0.0, 'Right': 0.0}
+        
         logging.info(f"Initializing 2-Stage Eye Detector: MediaPipe + YOLO")
         logging.info(f"Model: {model_path}")
         
@@ -85,6 +90,18 @@ class EyeMovementDetector:
         except Exception as e:
             logging.error(f"Error loading eye detection model: {e}")
             return False
+            
+    def trigger_calibration(self):
+        """Trigger calibration on next frame"""
+        self.should_calibrate = True
+        logging.info("Calibration triggered for next frame")
+        return True
+        
+    def reset_calibration(self):
+        """Reset calibration data"""
+        self.is_calibrated = False
+        self.calibration_offsets = {}
+        logging.info("Calibration reset")
     
     def detect_eyes_with_keypoints(self, frame):
         """
@@ -183,19 +200,16 @@ class EyeMovementDetector:
         logging.debug(f"Total eyes detected: {len(detections)}") 
         return detections
     
-    def calculate_risk(self, keypoints):
+    def calculate_risk(self, keypoints, eye_name="Unknown"):
         """
         Calculate risk status based on pupil position (from notebook)
         
         Args:
             keypoints: Dictionary with 'inner', 'outer', 'pupil' positions
-                      Format: {'inner': (x, y, vis), 'outer': (x, y, vis), 'pupil': (x, y, vis)}
+            eye_name: Name of the eye ('Left' or 'Right') for calibration lookup
             
         Returns:
             tuple: (status, score, horizontal_ratio, vertical_ratio)
-                   status: "LOOKING DOWN (RISK)", "LOOKING UP (THINKING)", 
-                          "LOOKING SIDE (RISK)", "CENTER (SAFE)"
-                   score: The dominant ratio value
         """
         if keypoints is None:
             return "Error", 0.0, 0.0, 0.0
@@ -215,21 +229,42 @@ class EyeMovementDetector:
             
             # 2. Vertical Ratio (Pupil Y vs Eye Center Y)
             eye_center_y = (inner_y + outer_y) / 2
-            vertical_ratio = (pupil_y - eye_center_y) / eye_width
+            raw_vertical_ratio = (pupil_y - eye_center_y) / eye_width
             
-            # 3. Horizontal Ratio
+            # 3. Apply Calibration (if available)
+            calibration_offset = self.calibration_offsets.get(eye_name, 0.0)
+            corrected_vertical_ratio = raw_vertical_ratio - calibration_offset
+            
+            # 4. Horizontal Ratio
             horizontal_ratio = (pupil_x - inner_x) / eye_width
             
-            # 4. Determine Status
+            # 5. Determine Status using Corrected Ratio
+            # If calibrated, we can use slightly tighter thresholds as noise is reduced
+            # But for now we stick to standard or user suggested ones
+            
+            # Calibration logic check
+            if self.should_calibrate:
+                # This will be handled in process_frame, but for calculation purposes
+                # we just use raw. The offset will be set in process_frame.
+                pass
+
+            # Use corrected ratio for decisions
+            decision_ratio = corrected_vertical_ratio
+            
+            # Thresholds
             # Positive V-Ratio = Looking Down (Y increases downwards)
-            if vertical_ratio > self.vertical_threshold:
-                return "LOOKING DOWN (RISK)", vertical_ratio, horizontal_ratio, vertical_ratio
-            elif vertical_ratio < -self.vertical_threshold:
-                return "LOOKING UP (THINKING)", abs(vertical_ratio), horizontal_ratio, vertical_ratio
+            
+            # Use 0.12 if calibrated (stricter/more sensitive), 0.15 if not (looser for robustness)
+            threshold = 0.12 if self.is_calibrated else self.vertical_threshold
+            
+            if decision_ratio > threshold:
+                return "LOOKING DOWN (RISK)", decision_ratio, horizontal_ratio, raw_vertical_ratio
+            elif decision_ratio < -threshold:
+                return "LOOKING UP (THINKING)", abs(decision_ratio), horizontal_ratio, raw_vertical_ratio
             elif horizontal_ratio < self.horizontal_min or horizontal_ratio > self.horizontal_max:
-                return "LOOKING SIDE (RISK)", abs(horizontal_ratio - 0.5) * 2, horizontal_ratio, vertical_ratio
+                return "LOOKING SIDE (RISK)", abs(horizontal_ratio - 0.5) * 2, horizontal_ratio, raw_vertical_ratio
             else:
-                return "CENTER (SAFE)", 1.0 - abs(vertical_ratio), horizontal_ratio, vertical_ratio
+                return "CENTER (SAFE)", 1.0 - abs(decision_ratio), horizontal_ratio, raw_vertical_ratio
         
         except Exception as e:
             logging.error(f"Error in risk calculation: {e}")
@@ -307,17 +342,33 @@ class EyeMovementDetector:
         # Analyze risk for each detection
         risk_detections = []
         
+        # Handle calibration flag
+        if self.should_calibrate:
+            self.is_calibrated = True
+            logging.info("Calibrating now...")
+        
         for detection in detections:
             # Calculate risk status
-            status, score, h_ratio, v_ratio = self.calculate_risk(
-                detection['keypoints']
+            eye_name = detection.get('eye_name', 'Unknown')
+            status, score, h_ratio, raw_v_ratio = self.calculate_risk(
+                detection['keypoints'], eye_name
             )
+            
+            # Perform calibration if requested
+            if self.should_calibrate:
+                self.calibration_offsets[eye_name] = raw_v_ratio
+                logging.info(f"Calibrated {eye_name} eye with offset: {raw_v_ratio:.4f}")
+                
+                # Recalculate with new calibration immediately
+                status, score, h_ratio, raw_v_ratio = self.calculate_risk(
+                    detection['keypoints'], eye_name
+                )
             
             # Add risk analysis to detection
             detection['risk_status'] = status
             detection['risk_score'] = score
             detection['horizontal_ratio'] = h_ratio
-            detection['vertical_ratio'] = v_ratio
+            detection['vertical_ratio'] = raw_v_ratio # Store raw for debug
             
             risk_detections.append(detection)
             
@@ -363,5 +414,8 @@ class EyeMovementDetector:
                            (x1 + 5, y2 + 28),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.4,
                            (255, 255, 255), 1)
+        
+        if self.should_calibrate:
+            self.should_calibrate = False
         
         return processed_frame, risk_detections

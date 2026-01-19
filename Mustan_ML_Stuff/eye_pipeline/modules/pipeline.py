@@ -82,6 +82,15 @@ class CameraPipeline:
         # Default: no processing, just return the frame
         return frame
     
+    def handle_input(self, key):
+        """
+        Handle keyboard input (override this method)
+        
+        Args:
+            key: Key code from waitKey
+        """
+        pass
+    
     def run(self):
         """Main pipeline loop"""
         if not self.initialize():
@@ -117,10 +126,14 @@ class CameraPipeline:
                 else:
                     self.display.show_frame(processed_frame)
                 
-                # Check for exit key
-                if self.display.check_exit_key(1):
+                # Input handling
+                key = self.display.wait_key(1)
+                if key == 27 or key == ord('q'):
                     logging.info("Exit key pressed")
                     break
+                
+                # Handle other inputs
+                self.handle_input(key)
                 
                 # Calculate FPS
                 frame_count += 1
@@ -299,8 +312,24 @@ class EyeMovementPipeline(CameraPipeline):
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
             cv2.putText(processed_frame, "P=Pupil (Center)", (10, legend_y + 65),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-        
+
+        # Calibration UI overlay
+        if self.eye_detector and not self.eye_detector.is_calibrated:
+             cv2.putText(processed_frame, "LOOK AT CENTER & PRESS 'C' TO CALIBRATE", 
+                         (100, 300), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+
         return processed_frame
+
+    def handle_input(self, key):
+        """Handle keyboard input for calibration"""
+        if key == ord('c') or key == ord('C'):
+            if self.eye_detector:
+                self.eye_detector.trigger_calibration()
+                logging.info("Calibration requested by user")
+        elif key == ord('r') or key == ord('R'):
+             if self.eye_detector:
+                self.eye_detector.reset_calibration()
+                logging.info("Calibration reset by user")
     
     def get_movement_statistics(self):
         """Get statistics about eye movements and risk status"""
