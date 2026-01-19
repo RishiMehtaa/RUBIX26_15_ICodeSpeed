@@ -182,8 +182,7 @@ class EyeMovementPipeline(CameraPipeline):
         
         self.eye_detector = EyeMovementDetector(
             model_path=self.config.EYE_MODEL_PATH,
-            confidence_threshold=self.config.EYE_CONFIDENCE_THRESHOLD,
-            face_model_name=self.config.FACE_MODEL_NAME
+            confidence_threshold=self.config.EYE_CONFIDENCE_THRESHOLD
         )
         
         if not self.eye_detector.load_models():
@@ -219,12 +218,12 @@ class EyeMovementPipeline(CameraPipeline):
         
         # Store detection history
         if detections:
-            for det in detections:
+            for i, det in enumerate(detections):
                 self.movement_history.append({
                     'timestamp': time.time(),
-                    'eye': det['eye'],
-                    'movement': det['class_name'],
-                    'confidence': det['confidence']
+                    'eye': f'eye_{i+1}',
+                    'risk_status': det.get('risk_status', 'Unknown'),
+                    'risk_score': det.get('risk_score', 0.0)
                 })
             
             # Keep only recent history
@@ -242,36 +241,87 @@ class EyeMovementPipeline(CameraPipeline):
             2
         )
         
-        # Display current eye movements
-        y_offset = 110
-        for det in detections:
-            text = f"{det['eye'].upper()}: {det['class_name']}"
+        # Display risk scores for each detection (Developer Info)
+        if detections:
+            risk_scores_text = "Risk Scores: "
+            for i, det in enumerate(detections):
+                score = det.get('risk_score', 0.0)
+                risk_scores_text += f"Eye{i+1}={score:.2f} "
+            
+            cv2.putText(
+                processed_frame,
+                risk_scores_text,
+                (10, 110),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (255, 100, 255),  # Pink color for developer info
+                2
+            )
+            y_offset = 150  # Start eye status below risk scores
+        else:
+            y_offset = 110
+        
+        # Display current eye risk status (summary on left side)
+        for i, det in enumerate(detections):
+            risk_status = det.get('risk_status', 'Unknown')
+            risk_score = det.get('risk_score', 0.0)
+            
+            # Color based on risk
+            if 'RISK' in risk_status:
+                text_color = (0, 0, 255)  # Red
+            elif 'THINKING' in risk_status:
+                text_color = (0, 165, 255)  # Orange
+            elif 'SAFE' in risk_status:
+                text_color = (0, 255, 0)  # Green
+            else:
+                text_color = (255, 255, 0)  # Yellow
+            
+            text = f"Eye {i+1}: {risk_status}"
             cv2.putText(
                 processed_frame,
                 text,
                 (10, y_offset),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (255, 255, 0),
+                0.6,
+                text_color,
                 2
             )
-            y_offset += 35
+            y_offset += 30
+        
+        # Show keypoint legend
+        if detections and self.config.EYE_SHOW_KEYPOINTS:
+            legend_y = processed_frame.shape[0] - 100
+            cv2.putText(processed_frame, "Keypoints:", (10, legend_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            cv2.putText(processed_frame, "I=Inner (Caruncle)", (10, legend_y + 25),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+            cv2.putText(processed_frame, "O=Outer (Margin)", (10, legend_y + 45),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
+            cv2.putText(processed_frame, "P=Pupil (Center)", (10, legend_y + 65),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
         
         return processed_frame
     
     def get_movement_statistics(self):
-        """Get statistics about eye movements"""
+        """Get statistics about eye movements and risk status"""
         if not self.movement_history:
             return {}
         
-        # Count movement types
-        movement_counts = {}
+        # Count risk status types
+        status_counts = {}
         for entry in self.movement_history:
-            movement = entry['movement']
-            movement_counts[movement] = movement_counts.get(movement, 0) + 1
+            status = entry['risk_status']
+            status_counts[status] = status_counts.get(status, 0) + 1
+        
+        # Calculate average FPS
+        total_time = 0
+        if len(self.movement_history) > 1:
+            total_time = self.movement_history[-1]['timestamp'] - self.movement_history[0]['timestamp']
+        avg_fps = len(self.movement_history) / total_time if total_time > 0 else 0
         
         return {
             'total_detections': len(self.movement_history),
-            'movement_counts': movement_counts,
-            'recent_movements': self.movement_history[-5:]  # Last 5 movements
+            'movement_counts': status_counts,
+            'recent_movements': self.movement_history[-5:],  # Last 5 movements
+            'avg_fps': avg_fps
         }

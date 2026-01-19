@@ -68,13 +68,12 @@ class EyeMovementDetector:
         logging.info(f"Model: {model_path}")
         
     def load_models(self):
-        """Load the YOLOv8 keypoint detection model (Stage 2)"""
+        """Load the YOLOv8 keypoint detection model"""
         try:
             from ultralytics import YOLO
             
             self.model = YOLO(self.model_path)
-            logging.info(f"✓ YOLO model loaded: {self.model_path}")
-            logging.info(f"✓ MediaPipe Face Mesh initialized")
+            logging.info(f"Eye detection model loaded: {self.model_path}")
             
             # Check if model has keypoints
             if hasattr(self.model, 'names'):
@@ -88,100 +87,99 @@ class EyeMovementDetector:
     
     def detect_eyes_with_keypoints(self, frame):
         """
-        2-Stage Detection Pipeline:
-        Stage 1: MediaPipe finds eyes in full frame
-        Stage 2: YOLO analyzes cropped eyes for keypoints
+        Detect eyes and extract keypoints
         
         Args:
             frame: Input frame (BGR)
             
         Returns:
-            list: List of eye detections with keypoints and crop info
+            list: List of eye detections with keypoints
+                  Each detection: {
+                      'bbox': (cx, cy, w, h),
+                      'confidence': float,
+                      'keypoints': {
+                          'inner': (x, y, vis),
+                          'outer': (x, y, vis),
+                          'pupil': (x, y, vis)
+                      }
+                  }
         """
         if self.model is None:
             logging.warning("Model not loaded")
             return []
         
-        h, w, _ = frame.shape
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        
-        # STAGE 1: MediaPipe finds the face and eye regions
-        results = self.face_mesh.process(rgb_frame)
-        
-        if not results.multi_face_landmarks:
-            logging.debug("No face detected by MediaPipe")
-            return []
-        
-        detections = []
-        
-        # Extract eye regions from MediaPipe landmarks
-        mesh_points = np.array([
-            np.multiply([p.x, p.y], [w, h]).astype(int) 
-            for p in results.multi_face_landmarks[0].landmark
-        ])
-        
-        for eye_info in self.eyes_indices:
-            try:
-                # Get bounding box of the eye from MediaPipe
-                pts = mesh_points[eye_info['indices']]
-                min_x, min_y = np.min(pts, axis=0)
-                max_x, max_y = np.max(pts, axis=0)
-                
-                # Add padding (make it square and slightly larger like training data)
-                eye_w, eye_h = max_x - min_x, max_y - min_y
-                center_x, center_y = min_x + eye_w//2, min_y + eye_h//2
-                
-                # Crop size: 1.8x the width (to include eyebrows/corners)
-                crop_size = int(max(eye_w, eye_h) * 1.8)
-                
-                # Coordinates for cropping
-                x1 = max(0, center_x - crop_size)
-                y1 = max(0, center_y - crop_size)
-                x2 = min(w, center_x + crop_size)
-                y2 = min(h, center_y + crop_size)
-                
-                # STAGE 2: Crop the eye region
-                eye_crop = frame[y1:y2, x1:x2]
-                if eye_crop.size == 0:
-                    continue
-                
-                # STAGE 3: Run YOLO on the cropped eye (matches training data scale)
-                yolo_results = self.model(eye_crop, verbose=False, conf=self.confidence_threshold)
-                
-                for r in yolo_results:
-                    # Check if keypoints are available
-                    if hasattr(r, 'keypoints') and r.keypoints is not None and len(r.keypoints.xy) > 0:
-                        kpts = r.keypoints.xy[0].cpu().numpy()  # Keypoints relative to crop
-                        kpts_conf = r.keypoints.conf[0].cpu().numpy() if hasattr(r.keypoints, 'conf') else np.ones(3)
-                        
-                        # Get bounding box from YOLO (relative to crop)
-                        if len(r.boxes) > 0:
-                            box = r.boxes[0]
-                            confidence = float(box.conf[0])
-                            
-                            # Store detection with crop info for drawing on full frame
-                            detection = {
-                                'eye_name': eye_info['name'],
-                                'crop_region': (x1, y1, x2, y2),
-                                'bbox': (int(x1), int(y1), int(x2), int(y2)),  # Full frame coordinates
-                                'xyxy': (int(x1), int(y1), int(x2), int(y2)),
-                                'confidence': confidence,
-                                'keypoints': {
-                                    'inner': (float(kpts[0][0]), float(kpts[0][1]), float(kpts_conf[0])),
-                                    'outer': (float(kpts[1][0]), float(kpts[1][1]), float(kpts_conf[1])),
-                                    'pupil': (float(kpts[2][0]), float(kpts[2][1]), float(kpts_conf[2]))
-                                },
-                                'keypoints_crop_relative': kpts  # For drawing
-                            }
-                            detections.append(detection)
-                            logging.debug(f"{eye_info['name']} eye detected with keypoints")
+        try:
+            # Run inference with lower confidence for debugging
+            results = self.model(frame, verbose=False, conf=self.confidence_threshold)
             
-            except Exception as e:
-                logging.debug(f"Error processing {eye_info['name']} eye: {e}")
-                continue
-        
-        logging.debug(f"Total eyes detected: {len(detections)}") 
-        return detections
+            detections = []
+            
+            for result in results:
+                # Get bounding boxes
+                boxes = result.boxes
+                
+                # Debug: Log what we're detecting
+                if len(boxes) > 0:
+                    logging.info(f"Detected {len(boxes)} objects")
+                    for idx, box in enumerate(boxes):
+                        conf = float(box.conf[0])
+                        logging.info(f"  Object {idx}: confidence={conf:.3f}")
+                else:
+                    logging.debug("No objects detected in frame")
+                
+                # Check if keypoints are available
+                if hasattr(result, 'keypoints') and result.keypoints is not None:
+                    keypoints = result.keypoints
+                    logging.info(f"Keypoints available: {len(keypoints.xy)} sets")
+                    
+                    for i, box in enumerate(boxes):
+                        # Extract bounding box
+                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                        cx = (x1 + x2) / 2
+                        cy = (y1 + y2) / 2
+                        w = x2 - x1
+                        h = y2 - y1
+                        confidence = float(box.conf[0])
+                        
+                        # Extract keypoints (3 keypoints per eye)
+                        if i < len(keypoints.xy):
+                            kpts = keypoints.xy[i].cpu().numpy()  # Shape: (3, 2)
+                            kpts_conf = keypoints.conf[i].cpu().numpy() if hasattr(keypoints, 'conf') else np.ones(3)
+                            
+                            if len(kpts) >= 3:
+                                detection = {
+                                    'bbox': (int(cx), int(cy), int(w), int(h)),
+                                    'xyxy': (int(x1), int(y1), int(x2), int(y2)),
+                                    'confidence': confidence,
+                                    'keypoints': {
+                                        'inner': (float(kpts[0][0]), float(kpts[0][1]), float(kpts_conf[0])),
+                                        'outer': (float(kpts[1][0]), float(kpts[1][1]), float(kpts_conf[1])),
+                                        'pupil': (float(kpts[2][0]), float(kpts[2][1]), float(kpts_conf[2]))
+                                    }
+                                }
+                                detections.append(detection)
+                else:
+                    # No keypoints, just use bounding box
+                    for box in boxes:
+                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                        cx = (x1 + x2) / 2
+                        cy = (y1 + y2) / 2
+                        w = x2 - x1
+                        h = y2 - y1
+                        confidence = float(box.conf[0])
+                        
+                        detections.append({
+                            'bbox': (int(cx), int(cy), int(w), int(h)),
+                            'xyxy': (int(x1), int(y1), int(x2), int(y2)),
+                            'confidence': confidence,
+                            'keypoints': None
+                        })
+            
+            return detections
+            
+        except Exception as e:
+            logging.error(f"Error during eye detection: {e}")
+            return []
     
     def calculate_risk(self, keypoints):
         """
@@ -242,7 +240,7 @@ class EyeMovementDetector:
         
         Args:
             frame: Input frame
-            detection: Detection dictionary with crop_region info
+            detection: Detection dictionary
             draw_keypoints: Whether to draw keypoints
             box_color: Color for bounding box
             thickness: Line thickness
@@ -252,8 +250,8 @@ class EyeMovementDetector:
         """
         annotated_frame = frame.copy()
         
-        # Draw bounding box (crop region)
-        x1, y1, x2, y2 = detection['crop_region']
+        # Draw bounding box
+        x1, y1, x2, y2 = detection['xyxy']
         cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), box_color, thickness)
         
         # Draw confidence
@@ -262,33 +260,43 @@ class EyeMovementDetector:
                    (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 
                    0.5, box_color, 2)
         
-        # Draw keypoints if available (map from crop coordinates to full frame)
+        # Draw keypoints if available
         if draw_keypoints and detection['keypoints'] is not None:
-            kpts_crop = detection['keypoints_crop_relative']
+            keypoints = detection['keypoints']
             
-            # Map keypoints from crop coordinates to full frame
-            for idx, (name, color) in enumerate([('inner', self.keypoint_colors['inner']),
-                                                   ('outer', self.keypoint_colors['outer']),
-                                                   ('pupil', self.keypoint_colors['pupil'])]):
-                if idx < len(kpts_crop):
-                    kx, ky = kpts_crop[idx]
-                    # Map to full frame coordinates
-                    full_x = int(x1 + kx)
-                    full_y = int(y1 + ky)
-                    
-                    cv2.circle(annotated_frame, (full_x, full_y), 4, color, -1)
-                    
-                    # Draw line between inner and outer corners
-                    if idx == 1 and 0 < len(kpts_crop):  # outer corner
-                        inner_x = int(x1 + kpts_crop[0][0])
-                        inner_y = int(y1 + kpts_crop[0][1])
-                        cv2.line(annotated_frame, (inner_x, inner_y), (full_x, full_y), (255, 255, 255), 1)
+            # Draw lines connecting keypoints (eye outline)
+            inner_pt = (int(keypoints['inner'][0]), int(keypoints['inner'][1]))
+            outer_pt = (int(keypoints['outer'][0]), int(keypoints['outer'][1]))
+            pupil_pt = (int(keypoints['pupil'][0]), int(keypoints['pupil'][1]))
+            
+            # Draw line between corners
+            if keypoints['inner'][2] > 0.3 and keypoints['outer'][2] > 0.3:
+                cv2.line(annotated_frame, inner_pt, outer_pt, (255, 255, 255), 1)
+            
+            # Draw keypoints
+            if keypoints['inner'][2] > 0.3:
+                cv2.circle(annotated_frame, inner_pt, 3, self.keypoint_colors['inner'], -1)
+                cv2.putText(annotated_frame, "I", 
+                           (inner_pt[0] - 10, inner_pt[1] - 10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, self.keypoint_colors['inner'], 1)
+            
+            if keypoints['outer'][2] > 0.3:
+                cv2.circle(annotated_frame, outer_pt, 3, self.keypoint_colors['outer'], -1)
+                cv2.putText(annotated_frame, "O", 
+                           (outer_pt[0] + 10, outer_pt[1] - 10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, self.keypoint_colors['outer'], 1)
+            
+            if keypoints['pupil'][2] > 0.3:
+                cv2.circle(annotated_frame, pupil_pt, 4, self.keypoint_colors['pupil'], -1)
+                cv2.putText(annotated_frame, "P", 
+                           (pupil_pt[0], pupil_pt[1] - 10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, self.keypoint_colors['pupil'], 1)
         
         return annotated_frame
     
     def process_frame(self, frame, draw=True, color=(255, 0, 0), thickness=2):
         """
-        Detect eyes and calculate risk in frame using 2-stage pipeline
+        Detect eyes and classify eye movements in frame
         
         Args:
             frame: Input frame
@@ -297,11 +305,11 @@ class EyeMovementDetector:
             thickness: Line thickness
             
         Returns:
-            tuple: (processed_frame, detections_with_risk)
+            tuple: (processed_frame, detections_with_classification)
         """
         processed_frame = frame.copy()
         
-        # Detect eyes with keypoints using 2-stage pipeline
+        # Detect eyes with keypoints
         detections = self.detect_eyes_with_keypoints(frame)
         
         # Analyze risk for each detection
@@ -341,7 +349,7 @@ class EyeMovementDetector:
                 )
                 
                 # Draw risk status label
-                x1, y1, x2, y2 = detection['crop_region']
+                x1, y1, x2, y2 = detection['xyxy']
                 label = f"{status}"
                 score_label = f"Score: {score:.2f}"
                 

@@ -1,23 +1,48 @@
 # Mustan ML Stuff
 
-Machine Learning projects and pipelines for computer vision and deep learning.
+Eye gaze detection and risk analysis using YOLOv8 pose estimation.
+
+## Overview
+
+This project implements real-time eye gaze tracking and risk assessment using a custom-trained YOLOv8-pose model. The model detects eyes and tracks 3 keypoints per eye to analyze gaze direction and identify potentially risky behavior (looking away from screen).
+
+### Model Architecture
+
+- **Model Type**: YOLOv8n-pose (Pose Estimation)
+- **Input**: 640x640 RGB images
+- **Output**: Eye detection with 3 keypoints per eye
+  1. **Inner corner** (caruncle)
+  2. **Outer corner** (interior margin)
+  3. **Pupil center** (iris center)
+
+### Training Data
+
+The model was trained on eye gaze detection dataset with:
+- **Data Format**: JSON files containing eye landmark coordinates
+- **Keypoint Extraction**:
+  - Inner corner: `caruncle_2d[0]`
+  - Outer corner: `interior_margin_2d[8]`
+  - Pupil: Average of all `iris_2d` points
+- **Training Config**: `kpt_shape: [3, 3]` (3 keypoints × 3 values each)
 
 ## Projects
 
-### 1. Eye Movement Detection Pipeline
-Real-time eye movement detection and classification into 10 categories.
+### 1. Eye Movement Detection Pipeline (Primary)
+Real-time eye detection with gaze-based risk analysis using geometric calculations.
 - 📁 Location: `eye_pipeline/`
 - 📖 [View Documentation](eye_pipeline/README.md)
+- ⚙️ Uses: `best.pt` model with keypoint detection
 
-### 2. Eye Detection & Tracking with YOLOv8
-Object detection pipeline for eye tracking with movement analysis.
-- 📁 Location: `eye_detection_tracking.py`
-- 📖 [View Guide](eye_dataset_guide.md)
+**Risk Analysis Categories**:
+- `CENTER (SAFE)` - User focused on screen
+- `LOOKING DOWN (RISK)` - Looking at phone/notes
+- `LOOKING UP (THINKING)` - Looking up (acceptable)
+- `LOOKING SIDE (RISK)` - Looking left/right significantly
 
-### 3. PyTorch Model Inspector
-Analyze and test any PyTorch `.pth` model file.
-- 📁 Location: `model_inspector.py`, `test_pretrained_model.py`
-- 📖 [View Documentation](README_model_inspector.md)
+### 2. Standalone Risk Analysis Script
+Simple webcam script for testing the risk calculation logic.
+- 📁 Location: `script.py`
+- 📖 Based on: Training notebook logic
 
 ## Quick Start
 

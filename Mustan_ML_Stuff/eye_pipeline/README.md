@@ -1,28 +1,25 @@
-# Eye Movement Detection Pipeline
+# Eye Gaze Detection & Risk Analysis Pipeline
 
-A modular camera pipeline that captures video from a camera feed and performs real-time eye movement detection and classification using computer vision and deep learning.
+A modular real-time pipeline for eye detection and gaze-based risk assessment using YOLOv8 pose estimation with keypoint tracking.
 
 ## Features
 
-- **10-Class Eye Movement Detection**: Classifies eye movements into:
-  1. Closed
-  2. Top Center
-  3. Top Right
-  4. Top Left
-  5. Bottom Center
-  6. Bottom Right
-  7. Bottom Left
-  8. Center Left
-  9. Center
-  10. Center Right
+- **Keypoint-Based Eye Detection**: Detects eyes with 3 keypoints per eye:
+  - Inner corner (caruncle)
+  - Outer corner (interior margin)
+  - Pupil center (iris center)
 
-- **Face Detection Integration**: Uses YOLOv8 or Haar Cascade for face detection
-- **Real-time Processing**: Optimized for live camera feed
+- **Geometric Risk Analysis**: Analyzes gaze direction using pupil position geometry:
+  - `CENTER (SAFE)` - User focused on screen
+  - `LOOKING DOWN (RISK)` - Potential phone/notes usage
+  - `LOOKING UP (THINKING)` - Acceptable behavior
+  - `LOOKING SIDE (RISK)` - Significant distraction
+
+- **Real-time Processing**: Optimized for live webcam feed
 - **Modular Architecture**: Separate modules for camera, display, detection, and configuration
 - **FPS Display**: Real-time performance monitoring
-- **Flexible Classification**: Supports both ML models and heuristic-based classification
-- **Movement History**: Tracks and analyzes eye movement patterns
 - **Context Manager Support**: Automatic resource cleanup
+- **Color-Coded Alerts**: Visual risk indicators (Green=Safe, Red=Risk, Orange=Thinking)
 
 ## Project Structure
 
@@ -34,46 +31,75 @@ eye_pipeline/
 │   ├── pipeline.py             # Base CameraPipeline & EyeMovementPipeline
 │   ├── camera_input.py         # Camera capture module
 │   ├── display.py              # Display window module
-│   ├── eye_detector.py         # Eye movement detection module
+│   ├── eye_detector.py         # Eye detection & risk analysis module
 │   └── config.py               # Configuration settings
 └── README.md                    # This file
 ```
 
 ## How It Works
 
+### Model Architecture
+
+**YOLOv8n-pose** trained on eye gaze detection dataset:
+- **Input**: 640x640 RGB images
+- **Output**: Bounding boxes + 3 keypoints per eye
+- **Training**: Based on `eye-detection-using-yolov8-mustansirhy.ipynb`
+
+### Risk Calculation Algorithm
+
+From the training notebook, risk is calculated using geometric analysis:
+
+```python
+# 1. Calculate eye width (distance between corners)
+eye_width = abs(outer_x - inner_x)
+
+# 2. Vertical ratio (pupil vs eye center)
+eye_center_y = (inner_y + outer_y) / 2
+vertical_ratio = (pupil_y - eye_center_y) / eye_width
+
+# 3. Horizontal ratio (pupil position)
+horizontal_ratio = (pupil_x - inner_x) / eye_width
+
+# 4. Classify based on thresholds:
+# - vertical_ratio > 0.15: LOOKING DOWN (RISK)
+# - vertical_ratio < -0.15: LOOKING UP (THINKING)
+# - horizontal_ratio < 0.3 or > 0.7: LOOKING SIDE (RISK)
+# - else: CENTER (SAFE)
+```
+
 ### Architecture Overview
 
 1. **Camera Input Module** (`camera_input.py`)
-   - Captures frames from the camera
+   - Captures frames from webcam
    - Manages camera lifecycle
    - Configurable resolution and FPS
 
-2. **Eye Movement Detector** (`eye_detector.py`)
-   - Detects faces using YOLOv8 or Haar Cascade
-   - Extracts eye regions from detected faces
-   - Classifies eye movements into 10 categories
-   - Supports both ML-based and heuristic classification
+2. **Eye Detector Module** (`eye_detector.py`)
+   - Loads best.pt YOLOv8-pose model
+   - Detects eyes with keypoints
+   - Calculates risk status using geometry
+   - Annotates frames with color-coded results
 
 3. **Display Module** (`display.py`)
    - Creates and manages display window
    - Renders processed frames with annotations
-   - Handles user input
+   - Handles user input (ESC/Q to quit)
 
 4. **Pipeline Module** (`pipeline.py`)
    - Orchestrates the entire processing flow
    - Manages frame loop and FPS calculation
-   - Tracks movement history and statistics
+   - Coordinates camera → detection → display
 
 5. **Main Application** (`main.py`)
    - Initializes and configures the pipeline
    - Runs detection loop
-   - Displays session statistics
+   - Provides session statistics
 
 ### Detection Flow
 
 ```
-Camera Feed → Capture Frame → Detect Face → Extract Eyes → 
-Classify Movement → Annotate → Display → Repeat
+Webcam → Capture Frame → YOLO Detection → Extract Keypoints →
+Calculate Risk (Geometry) → Color-Code Result → Annotate → Display
 ```
 
 ## Installation & Setup

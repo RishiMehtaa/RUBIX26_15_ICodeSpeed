@@ -28,36 +28,24 @@ class Config:
     
     # Eye Detection Settings
     EYE_DETECTION_ENABLED = True
-    EYE_MODEL_PATH = "eye_movement_model.pth"  # Path to custom trained model
-    EYE_CONFIDENCE_THRESHOLD = 0.6
+    EYE_MODEL_PATH = "best.pt"  # YOLOv8 model with keypoints (best.pt)
+    EYE_CONFIDENCE_THRESHOLD = 0.5
     EYE_BOX_COLOR = (255, 0, 0)  # Blue (B, G, R)
     EYE_BOX_THICKNESS = 2
     EYE_SHOW_CONFIDENCE = True
     EYE_SHOW_LABEL = True
+    EYE_SHOW_KEYPOINTS = True  # Show eye keypoints (inner, outer, pupil)
     
-    # Face detection for eye region extraction
-    FACE_DETECTION_ENABLED = True
+    # Face detection (optional - best.pt detects eyes directly)
+    FACE_DETECTION_ENABLED = False  # Not needed with best.pt
     FACE_MODEL_NAME = "yolov8n-face.pt"  # YOLOv8 face model
     FACE_CONFIDENCE_THRESHOLD = 0.5
     
-    # Eye Movement Classes
-    EYE_MOVEMENT_CLASSES = [
-        "Closed",
-        "Top Center",
-        "Top Right",
-        "Top Left",
-        "Bottom Center",
-        "Bottom Right",
-        "Bottom Left",
-        "Center Left",
-        "Center",
-        "Center Right"
-    ]
-    
-    # Eye Region Settings
-    EYE_REGION_CROP = True  # Crop eye region from face
-    EYE_REGION_EXPAND = 0.2  # Expand eye region by 20%
-    EYE_INPUT_SIZE = (224, 224)  # Input size for model
+    # Risk Analysis Settings (based on pupil position geometry)
+    RISK_VERTICAL_THRESHOLD = 0.15  # Threshold for looking up/down
+    RISK_HORIZONTAL_MIN = 0.3  # Minimum horizontal ratio for center
+    RISK_HORIZONTAL_MAX = 0.7  # Maximum horizontal ratio for center
+    SHOW_RISK_STATUS = True  # Display risk status on frame
     
     @classmethod
     def from_dict(cls, config_dict):

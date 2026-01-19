@@ -1,59 +1,89 @@
+"""
+Eye Gaze Risk Analysis Script
+Uses best.pt YOLOv8-pose model to detect eyes and analyze gaze direction for risk assessment.
+
+Based on training notebook: eye-detection-using-yolov8-mustansirhy.ipynb
+Model: YOLOv8n-pose with 3 keypoints per eye (inner corner, outer corner, pupil center)
+"""
+
 import cv2
 from ultralytics import YOLO
 import numpy as np
 
 # --- CONFIGURATION ---
-MODEL_PATH = "best.pt"   # Path to your downloaded file
+MODEL_PATH = "best.pt"   # Path to your best.pt model file
 RISK_THRESHOLD = 50      # Alert if risk is above this
 risk_score = 0           # Starting score
 
-# --- 1. RISK LOGIC (Exact copy from training) ---
+# --- 1. RISK LOGIC (From training notebook) ---
 def calculate_risk(keypoints, current_score):
     """
-    Calculates risk based on gaze direction.
-    keypoints: [(inner_x, inner_y), (outer_x, outer_y), (pupil_x, pupil_y)]
+    Calculates risk based on gaze direction using geometric analysis.
+    
+    This function implements the exact logic from the training notebook:
+    - Analyzes pupil position relative to inner/outer eye corners
+    - Calculates vertical and horizontal ratios
+    - Determines risk status based on gaze direction
+    
+    Args:
+        keypoints: numpy array of shape (3, 2) -> [(inner_x, inner_y), (outer_x, outer_y), (pupil_x, pupil_y)]
+                   Keypoint order from model:
+                   0: Inner corner (caruncle_2d[0] from training data)
+                   1: Outer corner (interior_margin_2d[8] from training data)
+                   2: Pupil center (average of iris_2d points from training data)
+        current_score: Current accumulated risk score
+    
+    Returns:
+        tuple: (status, new_score, color)
+               status: Risk status string
+               new_score: Updated risk score
+               color: BGR color for visualization
     """
-    if len(keypoints) < 3: return "LOST TRACK", current_score
+    if len(keypoints) < 3: 
+        return "LOST TRACK", current_score, (128, 128, 128)
 
-    # Unpack points (Indices: 0=Inner, 1=Outer, 2=Pupil)
+    # Unpack keypoints (order from model)
     inner, outer, pupil = keypoints[0], keypoints[1], keypoints[2]
     
-    # Calculate geometric relationships
-    eye_width = abs(outer[0] - inner[0]) + 1e-6 
-    eye_center_y = (inner[1] + outer[1]) / 2
+    # 1. Calculate Eye Width
+    eye_width = abs(outer[0] - inner[0]) + 1e-6  # Avoid division by zero
     
-    # Ratios
+    # 2. Vertical Ratio (Pupil Y vs Eye Center Y)
+    eye_center_y = (inner[1] + outer[1]) / 2
     vertical_ratio = (pupil[1] - eye_center_y) / eye_width
+    
+    # 3. Horizontal Ratio (Pupil X relative to inner corner)
     horizontal_ratio = (pupil[0] - inner[0]) / eye_width
 
-    # Logic
+    # 4. Determine Status and Risk Increment
     risk_inc = 0
     status = "Normal"
-    color = (0, 255, 0) # Green
+    color = (0, 255, 0)  # Green
 
     # LOOKING DOWN (High Risk)
+    # Positive V-Ratio = Looking Down (Y increases downwards)
     if vertical_ratio > 0.15: 
         status = "LOOKING DOWN (RISK)"
-        risk_inc = 2 + (vertical_ratio * 10) # Faster increase if looking deeper down
-        color = (0, 0, 255) # Red
+        risk_inc = 2 + (vertical_ratio * 10)  # Faster increase if looking deeper down
+        color = (0, 0, 255)  # Red
 
     # LOOKING UP (Thinking - Safe)
     elif vertical_ratio < -0.15:
-        status = "THINKING (UP)"
-        risk_inc = 0 # No penalty
-        color = (255, 255, 0) # Cyan
+        status = "LOOKING UP (THINKING)"
+        risk_inc = 0  # No penalty
+        color = (255, 255, 0)  # Cyan
 
     # SIDE GLANCE (Medium Risk)
     elif horizontal_ratio < 0.30 or horizontal_ratio > 0.70:
-        status = "SIDE GLANCE (RISK)"
+        status = "LOOKING SIDE (RISK)"
         risk_inc = 1
-        color = (0, 165, 255) # Orange
+        color = (0, 165, 255)  # Orange
 
     # CENTER (Safe)
     else:
-        status = "FOCUSED"
-        risk_inc = -0.5 # Cool down score slowly
-        color = (0, 255, 0) # Green
+        status = "CENTER (SAFE)"
+        risk_inc = -0.5  # Cool down score slowly
+        color = (0, 255, 0)  # Green
 
     # Update Score (Clamp between 0 and 100)
     new_score = max(0, min(100, current_score + risk_inc))
