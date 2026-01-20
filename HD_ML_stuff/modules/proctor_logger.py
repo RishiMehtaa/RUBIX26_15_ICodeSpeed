@@ -147,19 +147,28 @@ class ProctorLogger:
             self.logger.debug(message)
     
     def save_session(self):
-        """Save session data to JSON file"""
-        with self.lock:
-            self.session_data['end_time'] = datetime.now().isoformat()
+        """Save session data to JSON file. Must be called with lock already held!"""
+        print("[DEBUG] === ENTERING ProctorLogger.save_session() ===")
+        print("[DEBUG] save_session Step 1: Setting end_time")
+        self.session_data['end_time'] = datetime.now().isoformat()
+        print("[DEBUG] save_session Step 2: End time set")
+        
+        try:
+            print(f"[DEBUG] save_session Step 3: Opening file {self.alerts_file}")
+            with open(self.alerts_file, 'w') as f:
+                print("[DEBUG] save_session Step 4: File opened, dumping JSON")
+                json.dump(self.session_data, f, indent=2)
+                print("[DEBUG] save_session Step 5: JSON dumped")
             
-            try:
-                with open(self.alerts_file, 'w') as f:
-                    json.dump(self.session_data, f, indent=2)
-                
-                self.logger.info(f"Session data saved to: {self.alerts_file}")
-                return True
-            except Exception as e:
-                self.logger.error(f"Failed to save session data: {e}")
-                return False
+            print("[DEBUG] save_session Step 6: File closed")
+            self.logger.info(f"Session data saved to: {self.alerts_file}")
+            print("[DEBUG] save_session Step 7: Returning True")
+            return True
+        except Exception as e:
+            print(f"[DEBUG] ERROR in save_session: {e}")
+            self.logger.error(f"Failed to save session data: {e}")
+            return False
+        print("[DEBUG] === EXITING ProctorLogger.save_session() ===")
     
     def get_session_summary(self):
         """
@@ -183,24 +192,41 @@ class ProctorLogger:
     
     def close(self):
         """Close logger and save session"""
+        print("[DEBUG] === ENTERING ProctorLogger.close() ===")
+        print("[DEBUG] ProctorLogger Step 0: Acquiring lock")
         with self.lock:
+            print("[DEBUG] ProctorLogger Step 1: Lock acquired")
             self.logger.info("=" * 80)
             self.logger.info("PROCTORING SESSION ENDED")
             self.logger.info(f"Duration: {(datetime.now() - self.session_start).total_seconds():.2f} seconds")
             self.logger.info(f"Total Frames: {self.session_data['statistics']['total_frames']}")
             self.logger.info(f"Total Alerts: {self.session_data['statistics']['total_alerts']}")
             
+            print("[DEBUG] ProctorLogger Step 2: Logged session end info")
+            
             if self.session_data['statistics']['alert_types']:
                 self.logger.info("\nAlert Summary:")
                 for alert_type, count in self.session_data['statistics']['alert_types'].items():
                     self.logger.info(f"  - {alert_type}: {count}")
             
+            print("[DEBUG] ProctorLogger Step 3: Logged alert summary")
             self.logger.info("=" * 80)
             
+            print("[DEBUG] ProctorLogger Step 4: Calling save_session()")
             # Save session data
             self.save_session()
+            print("[DEBUG] ProctorLogger Step 5: save_session() returned")
             
+            print("[DEBUG] ProctorLogger Step 6: Removing handlers")
             # Remove handlers
             for handler in self.logger.handlers[:]:
+                print(f"[DEBUG] ProctorLogger Step 7: Closing handler {handler}")
                 handler.close()
+                print(f"[DEBUG] ProctorLogger Step 8: Removing handler {handler}")
                 self.logger.removeHandler(handler)
+                print(f"[DEBUG] ProctorLogger Step 9: Handler removed")
+            
+            print("[DEBUG] ProctorLogger Step 10: All handlers removed")
+        
+        print("[DEBUG] ProctorLogger Step 11: Lock released")
+        print("[DEBUG] === EXITING ProctorLogger.close() ===")

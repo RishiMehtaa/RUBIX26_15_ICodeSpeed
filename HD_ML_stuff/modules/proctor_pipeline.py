@@ -6,8 +6,6 @@ Main proctoring pipeline that orchestrates multiple detection modules
 import logging
 import cv2
 import time
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from .camera_pipeline import CameraPipeline
 from .base_detector import BaseDetector
 from .proctor_logger import ProctorLogger
@@ -34,12 +32,9 @@ class ProctorPipeline(CameraPipeline):
         self.detectors = {}  # Changed to dict for easier lookup
         self.face_detector = None
         self.face_matcher = None
+        self.eye_detector = None  # Add eye detector reference
         self.frame_skip = frame_skip
         self.frame_counter = 0
-        
-        # Thread pool for parallel detector execution
-        self.max_workers = 4  # Maximum number of parallel detector threads
-        self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
         
         # Session logger
         self.session_logger = ProctorLogger(session_id=session_id)
@@ -53,7 +48,7 @@ class ProctorPipeline(CameraPipeline):
         }
         
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.info(f"Proctoring pipeline initialized with frame_skip={frame_skip}, parallel processing enabled")
+        self.logger.info(f"Proctoring pipeline initialized with frame_skip={frame_skip}, sequential processing enabled")
         self.session_logger.log_info(f"Proctoring pipeline initialized with frame_skip={frame_skip}")
     
     def register_detector(self, detector: BaseDetector):
@@ -81,9 +76,18 @@ class ProctorPipeline(CameraPipeline):
         self.detectors[detector.name] = detector
         
         # Keep references to specific detectors for optimized pipeline
-        if detector.name == "FaceDetector" or "Face" in detector.name:
+        # Check in order of specificity to avoid false matches
+        if detector.name == "FaceDetector":
             self.face_detector = detector
-        elif detector.name == "FaceMatcher" or "Matcher" in detector.name:
+        elif detector.name == "FaceMatcher":
+            self.face_matcher = detector
+        elif detector.name == "EyeDetector" or "Eye" in detector.name:
+            self.eye_detector = detector
+        elif "Detector" in detector.name and "Face" in detector.name:
+            # Fallback for face detectors with different names
+            self.face_detector = detector
+        elif "Matcher" in detector.name or "Match" in detector.name:
+            # Fallback for matchers with different names
             self.face_matcher = detector
         
         self.proctoring_results["detections"][detector.name] = []
@@ -154,47 +158,15 @@ class ProctorPipeline(CameraPipeline):
             return True
         return False
     
-    def _run_detector(self, detector, frame):
-        """
-        Run a single detector on a frame (executed in parallel thread)
-        
-        Args:
-            detector: Detector instance to run
-            frame: Input frame
-            
-        Returns:
-            tuple: (detector_name, detection_results, processing_time)
-        """
-        try:
-            start_time = time.time()
-            # Each detector gets its own copy of the frame for thread safety
-            frame_copy = frame.copy()
-            
-            # Check if this is FaceDetector and verification is enabled
-            if detector.name == "FaceDetector" and hasattr(self.config, 'FACE_VERIFICATION_ENABLED'):
-                verify_enabled = self.config.FACE_VERIFICATION_ENABLED
-                _, detection_results = detector.process_frame(frame_copy, verify=verify_enabled, draw=False)
-            else:
-                _, detection_results = detector.process_frame(frame_copy, draw=False)
-            
-            processing_time = time.time() - start_time
-            
-            detection_results["processing_time_ms"] = processing_time * 1000
-            detection_results["timestamp"] = time.time()
-            
-            return detector.name, detection_results, None
-            
-        except Exception as e:
-            self.logger.error(f"Error processing frame with {detector.name}: {e}", exc_info=True)
-            return detector.name, None, str(e)
+
     
     def process_frame(self, frame):
         """
-        Process frame with optimized pipeline:
-        1. Detect faces using FaceDetector
-        2. Check for multiple faces / no faces (log alerts)
-        3. For single face, spawn thread for face verification
-        4. Draw results on frame
+        Process frame with SEQUENTIAL pipeline:
+        1. MediaPipe face detector gets faces
+        2. Multiple faces alert
+        3. If single face then verify
+        4. After verify check eye movement
         
         Args:
             frame: Input frame from camera
@@ -217,7 +189,7 @@ class ProctorPipeline(CameraPipeline):
         
         annotated_frame = frame.copy()
         
-        # Step 1: Get face meshes from FaceDetector
+        # STEP 1: MediaPipe face detector gets faces
         face_meshes = []
         if self.face_detector and self.face_detector.enabled:
             try:
@@ -228,8 +200,9 @@ class ProctorPipeline(CameraPipeline):
         
         num_faces = len(face_meshes)
         verification_result = None
+        eye_result = None
         
-        # Step 2: Check for alerts
+        # STEP 2: Multiple faces alert
         if num_faces > 1:
             # Multiple faces detected - LOG ALERT
             alert_msg = f"Multiple people detected: {num_faces} faces"
@@ -262,33 +235,61 @@ class ProctorPipeline(CameraPipeline):
                 "severity": "warning"
             })
         elif num_faces == 1:
-            # Single face - spawn thread for verification
+            # STEP 3: If single face then verify
             if self.face_matcher and self.face_matcher.enabled:
                 try:
-                    # Run face verification in thread
-                    future = self.executor.submit(self._verify_face_thread, frame, face_meshes[0])
-                    # Wait for result (or timeout)
-                    try:
-                        verification_result = future.result(timeout=0.5)
-                    except Exception as e:
-                        self.logger.error(f"Face verification timeout/error: {e}")
-                        verification_result = {'matched': False, 'error': str(e)}
+                    verification_result = self._verify_face_sequential(frame, face_meshes[0])
                 except Exception as e:
-                    self.logger.error(f"Error spawning verification thread: {e}")
+                    self.logger.error(f"Error during face verification: {e}")
                     self.session_logger.log_alert('verification_error', f"Verification failed: {e}", 'critical')
+                    verification_result = {'matched': False, 'error': str(e)}
+            
+            # STEP 4: After verify check eye movement
+            if self.eye_detector and self.eye_detector.enabled:
+                try:
+                    eye_result = self.eye_detector.detect_eyes_with_keypoints(frame, face_meshes)
+                    
+                    # Check for eye movement alerts
+                    if eye_result and 'eyes' in eye_result:
+                        for eye_data in eye_result['eyes']:
+                            if eye_data.get('risk_status') == 'RISK':
+                                alert_msg = f"Suspicious eye movement detected: {eye_data.get('name', 'Unknown')} eye"
+                                self.logger.warning(alert_msg)
+                                self.session_logger.log_alert(
+                                    'eye_movement',
+                                    alert_msg,
+                                    'warning',
+                                    eye_data
+                                )
+                                self.proctoring_results["alerts"].append({
+                                    "timestamp": time.time(),
+                                    "type": "eye_movement",
+                                    "message": alert_msg,
+                                    "severity": "warning"
+                                })
+                except Exception as e:
+                    self.logger.error(f"Error during eye detection: {e}")
+                    self.session_logger.log_alert('eye_detection_error', f"Eye detection failed: {e}", 'info')
         
-        # Step 3: Draw face meshes on frame
+        # Draw face meshes on frame
         if face_meshes and self.face_detector:
             annotated_frame = self.face_detector.draw_faces(annotated_frame, face_meshes)
         
-        # Step 4: Add verification status overlay (top left)
-        annotated_frame = self._add_verification_overlay(annotated_frame, num_faces, verification_result)
+        # Draw eye detection results if available
+        if eye_result and self.eye_detector:
+            try:
+                annotated_frame = self.eye_detector.draw_eye_keypoints(annotated_frame, eye_result)
+            except Exception as e:
+                self.logger.error(f"Error drawing eye keypoints: {e}")
+        
+        # Add verification status overlay (top left)
+        annotated_frame = self._add_verification_overlay(annotated_frame, num_faces, verification_result, eye_result)
         
         return annotated_frame
     
-    def _verify_face_thread(self, frame, face_data):
+    def _verify_face_sequential(self, frame, face_data):
         """
-        Thread worker for face verification
+        Sequential face verification (no threading)
         
         Args:
             frame: Input frame
@@ -320,7 +321,7 @@ class ProctorPipeline(CameraPipeline):
             
             return result
         except Exception as e:
-            self.logger.error(f"Error in verification thread: {e}")
+            self.logger.error(f"Error in face verification: {e}")
             return {'matched': False, 'error': str(e)}
     
     def _add_skip_overlay(self, frame):
@@ -337,7 +338,7 @@ class ProctorPipeline(CameraPipeline):
         )
         return overlay
     
-    def _add_verification_overlay(self, frame, num_faces, verification_result):
+    def _add_verification_overlay(self, frame, num_faces, verification_result, eye_result=None):
         """
         Add verification status overlay to top left
         
@@ -345,6 +346,7 @@ class ProctorPipeline(CameraPipeline):
             frame: Input frame
             num_faces: Number of faces detected
             verification_result: Verification result from FaceMatcher
+            eye_result: Eye detection result (optional)
             
         Returns:
             Frame with overlay
@@ -385,6 +387,24 @@ class ProctorPipeline(CameraPipeline):
             color,
             2
         )
+        
+        # Add eye status if available
+        if eye_result and 'eyes' in eye_result:
+            y_offset = 50
+            for eye_data in eye_result['eyes']:
+                eye_status = eye_data.get('risk_status', 'UNKNOWN')
+                eye_color = (0, 255, 0) if eye_status == 'SAFE' else (0, 0, 255) if eye_status == 'RISK' else (255, 165, 0)
+                eye_text = f"{eye_data.get('name', 'Eye')}: {eye_status}"
+                cv2.putText(
+                    overlay,
+                    eye_text,
+                    (10, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    eye_color,
+                    1
+                )
+                y_offset += 20
         
         # Add frame counter
         stats_text = f"Frame: {self.proctoring_results['total_frames_processed']}/{self.proctoring_results['total_frames_captured']}"
@@ -636,34 +656,90 @@ class ProctorPipeline(CameraPipeline):
     
     def cleanup(self):
         """Cleanup resources (override from CameraPipeline)"""
-        # Shutdown thread pool
-        self.logger.info("Shutting down detector thread pool...")
-        self.executor.shutdown(wait=True)
+        print("\n[DEBUG] === ENTERING ProctorPipeline.cleanup() ===")
+        print("[DEBUG] Step 0: Starting cleanup")
         
-        # Generate final report
-        self.logger.info("Generating final proctoring report...")
-        report = self.get_proctoring_report()
-        
-        self.logger.info("=" * 60)
-        self.logger.info("PROCTORING SESSION REPORT")
-        self.logger.info("=" * 60)
-        self.logger.info(f"Total Frames Captured: {report['session_stats']['total_frames_captured']}")
-        self.logger.info(f"Total Frames Processed: {report['session_stats']['total_frames_processed']}")
-        self.logger.info(f"Processing Ratio: {report['session_stats']['processing_ratio']:.2%}")
-        self.logger.info(f"Total Alerts: {len(report['alerts'])}")
-        
-        if report['alert_summary']:
-            self.logger.info("\nAlert Summary:")
-            for alert_type, count in report['alert_summary'].items():
-                self.logger.info(f"  - {alert_type}: {count}")
-        
-        self.logger.info("=" * 60)
+        try:
+            print("[DEBUG] Step 1: Generating final report")
+            # Generate final report
+            self.logger.info("Generating final proctoring report...")
+            report = self.get_proctoring_report()
+            
+            print("[DEBUG] Step 2: Logging report stats")
+            self.logger.info("=" * 60)
+            self.logger.info("PROCTORING SESSION REPORT")
+            self.logger.info("=" * 60)
+            self.logger.info(f"Total Frames Captured: {report['session_stats']['total_frames_captured']}")
+            self.logger.info(f"Total Frames Processed: {report['session_stats']['total_frames_processed']}")
+            self.logger.info(f"Processing Ratio: {report['session_stats']['processing_ratio']:.2%}")
+            self.logger.info(f"Total Alerts: {len(report['alerts'])}")
+            
+            if report['alert_summary']:
+                self.logger.info("\nAlert Summary:")
+                for alert_type, count in report['alert_summary'].items():
+                    self.logger.info(f"  - {alert_type}: {count}")
+            
+            self.logger.info("=" * 60)
+            print("[DEBUG] Step 3: Report generation complete")
+        except Exception as e:
+            print(f"[DEBUG] ERROR in report generation: {e}")
+            self.logger.error(f"Error generating final report: {e}")
         
         # Close session logger and save
-        summary = self.session_logger.get_session_summary()
-        self.logger.info(f"Session logs saved to: {summary['log_file']}")
-        self.logger.info(f"Session alerts saved to: {summary['alerts_file']}")
-        self.session_logger.close()
+        try:
+            print("[DEBUG] Step 4: Checking session logger")
+            if hasattr(self, 'session_logger') and self.session_logger:
+                print("[DEBUG] Step 5: Getting session summary")
+                summary = self.session_logger.get_session_summary()
+                self.logger.info(f"Session logs saved to: {summary['log_file']}")
+                self.logger.info(f"Session alerts saved to: {summary['alerts_file']}")
+                print("[DEBUG] Step 6: Closing session logger")
+                self.session_logger.close()
+                print("[DEBUG] Step 7: Session logger closed")
+        except Exception as e:
+            print(f"[DEBUG] ERROR closing session logger: {e}")
+            self.logger.error(f"Error closing session logger: {e}")
         
-        # Call parent cleanup
-        super().cleanup()
+        # Cleanup all registered detectors
+        try:
+            print("[DEBUG] Step 8: Checking detectors")
+            if hasattr(self, 'detectors') and self.detectors:
+                print(f"[DEBUG] Step 9: Found {len(self.detectors)} detectors to clean")
+                self.logger.info("Cleaning up registered detectors...")
+                # Create a list copy to avoid modifying dict during iteration
+                detector_items = list(self.detectors.items())
+                print(f"[DEBUG] Step 10: Created detector list copy with {len(detector_items)} items")
+                
+                for idx, (detector_name, detector) in enumerate(detector_items):
+                    try:
+                        print(f"[DEBUG] Step 11.{idx}: Cleaning detector '{detector_name}'")
+                        if hasattr(detector, 'cleanup') and callable(detector.cleanup):
+                            self.logger.info(f"Cleaning up {detector_name}...")
+                            print(f"[DEBUG] Step 12.{idx}: Calling cleanup() on '{detector_name}'")
+                            detector.cleanup()
+                            print(f"[DEBUG] Step 13.{idx}: Cleanup completed for '{detector_name}'")
+                        else:
+                            print(f"[DEBUG] Step 12.{idx}: No cleanup method for '{detector_name}'")
+                            self.logger.warning(f"{detector_name} has no cleanup method")
+                    except Exception as e:
+                        print(f"[DEBUG] ERROR cleaning up {detector_name}: {e}")
+                        self.logger.error(f"Error cleaning up {detector_name}: {e}", exc_info=True)
+                
+                print("[DEBUG] Step 14: Clearing detectors dict")
+                self.detectors.clear()
+                print("[DEBUG] Step 15: Detectors cleared")
+                self.logger.info("All detectors cleaned up")
+        except Exception as e:
+            print(f"[DEBUG] ERROR during detector cleanup: {e}")
+            self.logger.error(f"Error during detector cleanup: {e}", exc_info=True)
+        
+        # Call parent cleanup (camera and display)
+        try:
+            print("[DEBUG] Step 16: Calling parent (CameraPipeline) cleanup")
+            super().cleanup()
+            print("[DEBUG] Step 17: Parent cleanup returned")
+        except Exception as e:
+            print(f"[DEBUG] ERROR in parent cleanup: {e}")
+            self.logger.error(f"Error in parent cleanup: {e}", exc_info=True)
+        
+        print("[DEBUG] === EXITING ProctorPipeline.cleanup() ===")

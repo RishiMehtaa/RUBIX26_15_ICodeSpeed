@@ -80,10 +80,21 @@ class CameraCapture:
     
     def stop(self):
         """Stop camera capture and release resources"""
-        if self.capture is not None:
-            self.capture.release()
+        print("[DEBUG] === ENTERING Camera.stop() ===")
+        try:
+            print("[DEBUG] Camera Step 0: Checking capture object")
+            if self.capture is not None:
+                print("[DEBUG] Camera Step 1: Calling capture.release()")
+                self.capture.release()
+                print("[DEBUG] Camera Step 2: Capture released")
+                self.is_opened = False
+                logging.info("Camera stopped and resources released")
+                print("[DEBUG] Camera Step 3: Cleanup complete")
+        except Exception as e:
+            print(f"[DEBUG] ERROR in Camera.stop(): {e}")
+            logging.error(f"Error stopping camera: {e}")
             self.is_opened = False
-            logging.info("Camera stopped and resources released")
+        print("[DEBUG] === EXITING Camera.stop() ===")
     
     def get_properties(self):
         """Get current camera properties"""

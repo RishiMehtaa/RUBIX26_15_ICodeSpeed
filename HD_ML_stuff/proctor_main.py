@@ -15,7 +15,7 @@ def main():
     Config.FRAME_SKIP = 2  # Process every 3rd frame
     Config.SHOW_FPS = True
     Config.FACE_DETECTION_ENABLED = True
-    Config.FACE_MATCHING_ENABLED = False
+    Config.FACE_MATCHING_ENABLED = True
     Config.PARTICIPANT_DATA_PATH = "data/participant.png"
     
     print("\n" + "="*70)
@@ -110,39 +110,21 @@ def main():
     print("Starting camera...")
     print("="*70 + "\n")
     
-    # Run the proctoring pipeline
+    # Run the proctoring pipeline (uses inherited run() method from CameraPipeline)
+    # This handles:
+    # - Camera initialization and capture loop
+    # - Frame processing (calls process_frame() which we override)
+    # - Display with FPS
+    # - Exit key detection (q or ESC)
+    # - Cleanup in finally block
     try:
-        if not proctor.start():
-            print("ERROR: Failed to start proctoring pipeline")
-            return
-        
-        while True:
-            # Capture frame
-            frame = proctor.capture_frame()
-            if frame is None:
-                break
-            
-            # Process frame with optimized pipeline
-            processed_frame = proctor.process_frame(frame)
-            
-            # Display
-            proctor.display_frame(processed_frame)
-            
-            # Check for quit
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q') or key == 27:  # q or ESC
-                print("\nQuitting...")
-                break
-        
+        proctor.run()
     except KeyboardInterrupt:
         print("\n\nProctoring session interrupted by user.")
     except Exception as e:
         print(f"\n\nERROR: {e}")
         import traceback
         traceback.print_exc()
-    finally:
-        # Cleanup and save session
-        proctor.stop()
     
     print("\n" + "="*70)
     print("Proctoring session ended.")

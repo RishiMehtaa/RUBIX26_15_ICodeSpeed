@@ -69,5 +69,9 @@ class BaseDetector(ABC):
         """Check if detector is initialized"""
         return self.initialized
     
+    def cleanup(self):
+        """Cleanup detector resources. Override in subclasses if specific cleanup is needed."""
+        self.logger.info(f"{self.name} detector cleanup complete (no resources to release)")
+    
     def __str__(self):
         return f"{self.__class__.__name__}(name='{self.name}', enabled={self.enabled}, initialized={self.initialized})"

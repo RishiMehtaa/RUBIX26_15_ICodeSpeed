@@ -147,13 +147,31 @@ class CameraPipeline:
     
     def cleanup(self):
         """Cleanup resources"""
+        print("\n[DEBUG] === ENTERING CameraPipeline.cleanup() ===")
+        print("[DEBUG] CameraPipeline Step 0: Starting cleanup")
         logging.info("Cleaning up pipeline resources...")
         self.is_running = False
         
-        if self.camera:
-            self.camera.stop()
+        try:
+            print("[DEBUG] CameraPipeline Step 1: Checking camera")
+            if self.camera:
+                print("[DEBUG] CameraPipeline Step 2: Stopping camera")
+                self.camera.stop()
+                print("[DEBUG] CameraPipeline Step 3: Camera stopped")
+        except Exception as e:
+            print(f"[DEBUG] ERROR stopping camera: {e}")
+            logging.error(f"Error stopping camera: {e}")
         
-        if self.display:
-            self.display.destroy_all()
+        try:
+            print("[DEBUG] CameraPipeline Step 4: Checking display")
+            if self.display:
+                print("[DEBUG] CameraPipeline Step 5: Destroying display")
+                self.display.destroy_all()
+                print("[DEBUG] CameraPipeline Step 6: Display destroyed")
+        except Exception as e:
+            print(f"[DEBUG] ERROR destroying display: {e}")
+            logging.error(f"Error destroying display: {e}")
         
+        print("[DEBUG] CameraPipeline Step 7: Cleanup complete")
         logging.info("Pipeline cleanup complete")
+        print("[DEBUG] === EXITING CameraPipeline.cleanup() ===")

@@ -31,3 +31,6 @@ logs/
 
 # Image data
 **/data/
+
+# Test
+test.py

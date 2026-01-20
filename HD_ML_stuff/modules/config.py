@@ -34,9 +34,9 @@ class Config:
     
     # Face Matching Settings (DeepFace)
     FACE_MATCHING_ENABLED = True  # Enable face verification against participant
-    FACE_MATCHING_BACKEND = "Facenet512"  # DeepFace backend: VGG-Face, Facenet, Facenet512, OpenFace, DeepFace, ArcFace, Dlib, SFace
+    FACE_MATCHING_BACKEND = "Facenet"  # DeepFace backend: VGG-Face, Facenet, Facenet512, OpenFace, DeepFace, ArcFace, Dlib, SFace
     FACE_MATCHING_DISTANCE_METRIC = "cosine"  # Distance metric: cosine, euclidean, euclidean_l2
-    FACE_MATCHING_THRESHOLD = 0.30  # Distance threshold (model-specific, lower = stricter)
+    FACE_MATCHING_THRESHOLD = 0.5  # Distance threshold (model-specific, lower = stricter)
     # Recommended thresholds (cosine): VGG-Face=0.40, Facenet=0.40, Facenet512=0.30, ArcFace=0.68, Dlib=0.07, SFace=0.593, OpenFace=0.10
     
     # Proctoring Settings

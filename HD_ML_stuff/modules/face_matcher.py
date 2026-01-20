@@ -148,17 +148,65 @@ class FaceMatcher(BaseDetector):
                 self.participant_embedding = None
                 return
             
-            # Extract embedding
-            self.participant_embedding = self._extract_embedding(participant_image)
+            self.logger.info(f"Participant image loaded: {participant_image.shape}")
+            
+            # Extract embedding - USE DETECTION for participant image since it's likely a full photo
+            # We use enforce_detection=True here to detect the face first
+            self.participant_embedding = self._extract_embedding_with_detection(participant_image)
             
             if self.participant_embedding is not None:
                 self.logger.info(f"Participant embedding cached: shape={self.participant_embedding.shape}")
             else:
-                self.logger.error("Failed to extract participant embedding")
+                self.logger.error("Failed to extract participant embedding - ensure participant.png contains a clear face")
                 
         except Exception as e:
             self.logger.error(f"Error loading participant embedding: {e}")
             self.participant_embedding = None
+    
+    def _extract_embedding_with_detection(self, full_image):
+        """
+        Extract embedding from a full image by detecting face first
+        Used for loading participant image which may not be pre-cropped
+        
+        Args:
+            full_image: Full image that may contain a face (numpy array BGR)
+            
+        Returns:
+            numpy array: Face embedding vector
+        """
+        try:
+            if full_image is None or full_image.size == 0:
+                return None
+            
+            self.logger.info("Extracting embedding with face detection enabled...")
+            
+            # Extract embedding using DeepFace with face detection enabled
+            embedding_objs = DeepFace.represent(
+                img_path=full_image,
+                model_name=self.model_name,
+                enforce_detection=True,  # Enable detection for full images
+                detector_backend='opencv',  # Use opencv for detection
+                align=True,
+                normalization='base'
+            )
+            
+            if not embedding_objs or len(embedding_objs) == 0:
+                self.logger.error("No face detected in participant image")
+                return None
+            
+            # Get embedding vector from first detected face
+            embedding = np.array(embedding_objs[0]['embedding'])
+            
+            # Store embedding dimension
+            if self.embedding_dim is None:
+                self.embedding_dim = len(embedding)
+                self.logger.info(f"Embedding dimension: {self.embedding_dim}")
+            
+            return embedding
+            
+        except Exception as e:
+            self.logger.error(f"Error extracting embedding with detection: {e}")
+            return None
     
     def _extract_embedding(self, face_roi):
         """
@@ -378,3 +426,25 @@ class FaceMatcher(BaseDetector):
         }
         
         return frame, results
+    
+    def cleanup(self):
+        """Release DeepFace model and cached embeddings"""
+        print(f"[DEBUG] === ENTERING {self.name}.cleanup() ===")
+        try:
+            print(f"[DEBUG] {self.name} Step 0: Clearing embeddings")
+            # Clear cached embeddings
+            self.participant_embedding = None
+            print(f"[DEBUG] {self.name} Step 1: participant_embedding = None")
+            self.embedding_dim = None
+            print(f"[DEBUG] {self.name} Step 2: embedding_dim = None")
+            self.initialized = False
+            print(f"[DEBUG] {self.name} Step 3: initialized = False")
+            
+            # DeepFace models are managed by the library internally
+            # Setting to None allows garbage collection
+            self.logger.info(f"{self.name} - DeepFace model and embeddings released")
+            print(f"[DEBUG] {self.name} Step 4: Cleanup complete")
+        except Exception as e:
+            print(f"[DEBUG] ERROR in {self.name}.cleanup(): {e}")
+            self.logger.error(f"Error cleaning up {self.name}: {e}")
+        print(f"[DEBUG] === EXITING {self.name}.cleanup() ===")

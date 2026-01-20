@@ -414,3 +414,15 @@ class EyeMovementDetector:
             self.should_calibrate = False
         
         return processed_frame, risk_detections
+    
+    def cleanup(self):
+        """Release YOLO model resources"""
+        try:
+            if self.model:
+                # YOLO model cleanup - set to None for garbage collection
+                self.model = None
+                logging.info(f"Eye Movement Detector - YOLO model resources released")
+            else:
+                logging.info(f"Eye Movement Detector cleanup complete (no model loaded)")
+        except Exception as e:
+            logging.error(f"Error cleaning up Eye Movement Detector: {e}")

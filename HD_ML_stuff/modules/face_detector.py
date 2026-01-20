@@ -266,3 +266,23 @@ class FaceDetector(BaseDetector):
             output_frame = frame
         
         return output_frame, detection_results
+    
+    def cleanup(self):
+        """Release MediaPipe FaceLandmarker resources"""
+        print(f"[DEBUG] === ENTERING {self.name}.cleanup() ===")
+        if self.face_landmarker:
+            try:
+                print(f"[DEBUG] {self.name} Step 0: Releasing face_landmarker")
+                # MediaPipe FaceLandmarker doesn't have explicit close, set to None for GC
+                self.face_landmarker = None
+                print(f"[DEBUG] {self.name} Step 1: Set to None")
+                self.initialized = False
+                self.logger.info(f"{self.name} - MediaPipe FaceLandmarker resources released")
+                print(f"[DEBUG] {self.name} Step 2: Cleanup complete")
+            except Exception as e:
+                print(f"[DEBUG] ERROR in {self.name}.cleanup(): {e}")
+                self.logger.error(f"Error cleaning up {self.name}: {e}")
+        else:
+            print(f"[DEBUG] {self.name}: No resources to clean")
+            self.logger.info(f"{self.name} cleanup complete (no resources loaded)")
+        print(f"[DEBUG] === EXITING {self.name}.cleanup() ===")
