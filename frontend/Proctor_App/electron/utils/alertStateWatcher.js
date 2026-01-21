@@ -67,7 +67,6 @@ class AlertStateWatcher extends EventEmitter {
 
         // Initialize previous state
         this.readAlertState().then(state => {
-            console.log(`[AlertStateWatcher] State : ${state}`);
             if (state) {
                 this.previousState = state;
             }
@@ -143,8 +142,7 @@ class AlertStateWatcher extends EventEmitter {
     }
 
     /**
-     * Check for active alerts and emit notifications
-     * Changed from detecting changes to reading current state
+     * Check for state changes
      */
     async checkForChanges() {
         const currentState = await this.readAlertState();
@@ -156,40 +154,44 @@ class AlertStateWatcher extends EventEmitter {
         // Initialize previous state if first read
         if (!this.previousState) {
             this.previousState = currentState;
+            return;
         }
 
-        // Check for active alerts (value = 1) and emit notifications
-        // Let the frontend handle deduplication based on timeout
-        const activeAlerts = this.detectActiveAlerts(currentState);
+        // Check for changes (0 -> 1 transitions)
+        const changes = this.detectStateChanges(this.previousState, currentState);
 
-        if (activeAlerts.length > 0) {
-            // Emit alerts for each active violation
-            for (const alert of activeAlerts) {
-                this.emitAlert(alert);
+        if (changes.length > 0) {
+            // Emit alerts for each change
+            for (const change of changes) {
+                this.emitAlert(change);
             }
-        }
 
-        // Update previous state for reference
-        this.previousState = currentState;
+            // Update previous state
+            this.previousState = currentState;
+        }
     }
 
     /**
-     * Detect active alerts (alerts with value = 1)
-     * @param {Array} state - Current state
-     * @returns {Array} Array of active alert objects
+     * Detect state changes (0 -> 1 transitions)
+     * @param {Array} oldState - Previous state
+     * @param {Array} newState - Current state
+     * @returns {Array} Array of change objects
      */
-    detectActiveAlerts(state) {
-        const activeAlerts = [];
+    detectStateChanges(oldState, newState) {
+        const changes = [];
 
-        for (let i = 0; i < state.length; i++) {
-            const value = state[i] || 0;
+        const maxLen = Math.max(oldState.length, newState.length);
 
-            // If alert is active (value = 1), create alert object
-            if (value === 1) {
+        for (let i = 0; i < maxLen; i++) {
+            const oldVal = oldState[i] || 0;
+            const newVal = newState[i] || 0;
+
+            // Detect 0 -> 1 transition
+            if (oldVal === 0 && newVal === 1) {
                 const alertDef = ALERT_TYPES[i];
                 
                 if (alertDef) {
-                    activeAlerts.push({
+                    changes.push({
                         index: i,
                         alertType: alertDef.id,
                         severity: alertDef.severity,
@@ -202,7 +204,7 @@ class AlertStateWatcher extends EventEmitter {
             }
         }
 
-        return activeAlerts;
+        return changes;
     }
 
     /**

@@ -19,6 +19,9 @@ env/
 # IDE
 .vscode/
 
+# Shared Memory
+shared_memory/*.mmap
+
 # Logs
 *.log
 logs/

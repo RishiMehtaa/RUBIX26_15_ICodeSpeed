@@ -27,6 +27,10 @@ class ProctorConfig:
     MAX_FPS = 60  # Maximum FPS to process
     FRAME_SKIP = 2  # Process every 3rd frame (0 = process all, 1 = every 2nd, 2 = every 3rd)
     
+    # Shared Memory Settings (for frontend frame streaming)
+    SHARED_MEMORY_ENABLED = True  # Enable shared memory buffer for zero-copy frame sharing
+    SHARED_MEMORY_PATH = "shared_memory/proctor_frame.mmap"  # Relative to project root
+    
     # Face Detection Settings (MediaPipe)
     FACE_DETECT_ENABLE = True
     FACE_MODEL_SELECTION = 1  # 0 for short-range (<2m), 1 for full-range (<5m)

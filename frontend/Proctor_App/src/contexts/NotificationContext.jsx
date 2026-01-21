@@ -15,19 +15,6 @@ export const NotificationProvider = ({ children }) => {
     const typeKey = category || message;
     const now = Date.now();
 
-    // Clean up expired entries from activeTypesRef before checking
-    const toDelete = [];
-    for (const [key, value] of activeTypesRef.current.entries()) {
-      const timeElapsed = now - value.timestamp;
-      if (timeElapsed >= value.duration) {
-        toDelete.push(key);
-      }
-    }
-    toDelete.forEach(key => {
-      console.log(`[Notification] Cleaning up expired entry: ${key}`);
-      activeTypesRef.current.delete(key);
-    });
-
     // Check if this type of notification is already active within its timeout window
     if (activeTypesRef.current.has(typeKey)) {
       const { timestamp, duration: activeDuration } = activeTypesRef.current.get(typeKey);
@@ -57,7 +44,6 @@ export const NotificationProvider = ({ children }) => {
     setNotifications(prev => [...prev, newNotification]);
     
     console.log(`[Notification] Added notification ${id}: ${message} (category: ${typeKey}, duration: ${duration}ms)`);
-    console.log(`[Notification] Active types count: ${activeTypesRef.current.size}`);
     
     return id;
   }, []);
@@ -69,7 +55,6 @@ export const NotificationProvider = ({ children }) => {
       
       // Remove it from active types tracking
       if (notification && notification.category) {
-        console.log(`[Notification] Removing notification ${id} and clearing category: ${notification.category}`);
         activeTypesRef.current.delete(notification.category);
       }
       

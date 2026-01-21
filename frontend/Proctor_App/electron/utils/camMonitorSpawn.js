@@ -169,15 +169,18 @@ class CameraMonitorSpawner {
     // Generate session ID
     this.sessionId = options.sessionId || `session_${Date.now()}`;
 
-    // Prepare environment variables
+    // Prepare environment variables for Python process
     const env = {
-      PROCTOR_SESSION_ID: this.sessionId,
+      // Session configuration
       PROCTOR_PARTICIPANT_IMAGE: this.participantImagePath,
       PROCTOR_DISPLAY_FEED: 'false', // Background mode
+      
+      // Detector enable/disable flags
       PROCTOR_FACE_DETECT: options.faceDetect !== false ? 'true' : 'false',
       PROCTOR_FACE_MATCH: options.faceMatch !== false ? 'true' : 'false',
       PROCTOR_EYE_TRACKING: options.eyeTracking !== false ? 'true' : 'false',
       PROCTOR_PHONE_DETECT: options.phoneDetect === true ? 'true' : 'false',
+      
       ...options.env
     };
 

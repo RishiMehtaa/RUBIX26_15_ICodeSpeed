@@ -1,11 +1,13 @@
 """
-Proctoring System - Background Mode Example
+Proctoring System - Background Mode
 Runs proctoring in background without displaying frames
+Supports shared memory buffer for zero-copy frame sharing with frontend
 """
 
 from modules import ProctorPipeline, ProctorConfig
 import cv2
 import time
+import os
 
 
 def main():
@@ -29,12 +31,17 @@ def main():
     print("="*70)
     print("\n DISPLAY IS DISABLED - RUNNING IN BACKGROUND")
     print("   Webcam feed will be processed without showing frames")
-    print("   All alerts and logs will be saved to disk\n")
+    print("   All alerts and logs will be saved to disk")
+    print("   Frames shared via memory-mapped file for frontend preview\n")
     
     print("Initializing proctoring system...")
     
-    # Create the proctoring pipeline - detectors auto-load based on config
-    proctor = ProctorPipeline(config=ProctorConfig, frame_skip=ProctorConfig.FRAME_SKIP, session_id=None)
+    # Create the proctoring pipeline (shared memory buffer auto-configured)
+    proctor = ProctorPipeline(
+        config=ProctorConfig,
+        frame_skip=ProctorConfig.FRAME_SKIP,
+        session_id=None  # Auto-generated
+    )
     
     # Get session info
     session_info = proctor.session_logger.get_session_summary()
