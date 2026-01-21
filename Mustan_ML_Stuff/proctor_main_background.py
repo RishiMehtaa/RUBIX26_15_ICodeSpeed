@@ -21,8 +21,8 @@ def main():
     ProctorConfig.PARTICIPANT_DATA_PATH = "data/participant.png"
     ProctorConfig.SHOW_ALL_FACE_LANDMARKS = False
     ProctorConfig.SHOW_LANDMARK_NUMBERS = False
-    ProctorConfig.EYE_TRACKING_ENABLE = True
-    ProctorConfig.PHONE_DETECT_ENABLE = False
+    ProctorConfig.EYE_TRACKING_ENABLE = False
+    ProctorConfig.PHONE_DETECT_ENABLE = True
 
     print("\n" + "="*70)
     print(" AI PROCTORING SYSTEM - BACKGROUND MODE".center(70))

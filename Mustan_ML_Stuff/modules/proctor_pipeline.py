@@ -258,7 +258,7 @@ class ProctorPipeline(CameraPipeline):
         if num_faces > 1:
             # Multiple faces detected - LOG ALERT
             alert_msg = f"Multiple people detected: {num_faces} faces"
-            self.logger.warning(alert_msg)
+            
             self.session_logger.log_alert(
                 'multiple_faces',
                 alert_msg,
@@ -274,7 +274,7 @@ class ProctorPipeline(CameraPipeline):
         elif num_faces == 0:
             # No face detected - LOG ALERT
             alert_msg = "No face detected"
-            self.logger.warning(alert_msg)
+            
             self.session_logger.log_alert(
                 'no_face',
                 alert_msg,
@@ -311,7 +311,6 @@ class ProctorPipeline(CameraPipeline):
                             # Check for risk alerts
                             if "RISK" in status:
                                 alert_msg = f"Suspicious eye movement detected: {detection.get('eye_name', 'Unknown')} eye - {status}"
-                                self.logger.warning(alert_msg)
                                 self.proctoring_results["alerts"].append({
                                     "timestamp": time.time(),
                                     "type": "eye_movement",
@@ -325,33 +324,33 @@ class ProctorPipeline(CameraPipeline):
                     self.logger.error(f"Error during eye detection: {e}")
                     self.session_logger.log_alert('eye_detection_error', f"Eye detection failed: {e}", 'info')
             
-            # STEP 5: Check for phone detection
-            if self.phone_detector and self.phone_detector.enabled:
-                try:
-                    # Process frame for phone detection
-                    _, phone_result = self.phone_detector.process_frame(frame, draw=False)
+        # STEP 5: Check for phone detection
+        phone_detected = False
+        if self.phone_detector and self.phone_detector.enabled:
+            try:
+                # Process frame for phone detection
+                _, phone_result = self.phone_detector.process_frame(frame, draw=False)
+                
+                # Check if phone was detected (alert flag)
+                if phone_result.get('alert', False):
+                    phone_detected = True
                     
-                    # Check if phone was detected (alert flag)
-                    if phone_result.get('alert', False):
-                        num_detections = phone_result.get('num_detections', 0)
-                        alert_msg = f"CHEATING ALERT: Phone detected - potential unauthorized device use ({num_detections} detection(s))"
-                        self.logger.warning(alert_msg)
-                        self.session_logger.log_alert(
-                            'cheating_phone_detected',
-                            alert_msg,
-                            'critical',
-                            phone_result
-                        )
-                        self.proctoring_results["alerts"].append({
-                            "timestamp": time.time(),
-                            "type": "cheating_phone_detected",
-                            "message": alert_msg,
-                            "severity": "critical"
-                        })
-                except Exception as e:
-                    self.logger.error(f"Error during phone detection: {e}")
-                    self.session_logger.log_alert('phone_detection_error', f"Phone detection failed: {e}", 'info')
-        
+                    self.session_logger.log_alert(
+                        'cheating_phone_detected',
+                        "Phone detected",
+                        'critical',
+                        phone_result  # Metadata stored but not logged
+                    )
+                    self.proctoring_results["alerts"].append({
+                        "timestamp": time.time(),
+                        "type": "cheating_phone_detected",
+                        "message": "Phone detected",
+                        "severity": "critical"
+                    })
+            except Exception as e:
+                self.logger.error(f"Error during phone detection: {e}")
+                self.session_logger.log_alert('phone_detection_error', f"Phone detection failed: {e}", 'info')
+    
         # Only draw annotations if DISPLAY_FEED is enabled
         if getattr(self.config, 'DISPLAY_FEED', True):
             # Draw face meshes on frame with configuration
@@ -373,8 +372,8 @@ class ProctorPipeline(CameraPipeline):
                 except Exception as e:
                     self.logger.error(f"Error drawing eye keypoints: {e}")
             
-            # Add verification status overlay (top left)
-            annotated_frame = self._add_verification_overlay(annotated_frame, num_faces, verification_result, eye_result)
+            # Add unified status overlay (FPS, face status, phone status)
+            annotated_frame = self._add_status_overlay(annotated_frame, num_faces, verification_result, phone_detected)
         
         return annotated_frame
     
@@ -399,13 +398,13 @@ class ProctorPipeline(CameraPipeline):
             # Match face
             result = self.face_matcher.match_with_details(face_roi)
             
-            # Log result only to session logger if failed
+            # Log result only to session logger if failed (simplified message)
             if not result.get('matched'):
                 self.session_logger.log_alert(
                     'face_mismatch',
-                    f"Face verification failed - distance: {result.get('distance', 'N/A')}",
+                    "Face verification failed",
                     'warning',
-                    result
+                    result  # Metadata stored but not logged
                 )
             
             return result
@@ -419,93 +418,98 @@ class ProctorPipeline(CameraPipeline):
         cv2.putText(
             overlay,
             f"Frame {self.proctoring_results['total_frames_captured']} (skipped)",
-            (10, 30),
+            (10, 25),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
+            0.5,
             (200, 200, 200),
             1
         )
         return overlay
     
-    def _add_verification_overlay(self, frame, num_faces, verification_result, eye_result=None):
+    def _add_status_overlay(self, frame, num_faces, verification_result, phone_detected):
         """
-        Add verification status overlay to top left
+        Add unified status overlay (FPS, Face Status, Phone Detection)
+        Stacked vertically in top-left corner
         
         Args:
             frame: Input frame
             num_faces: Number of faces detected
             verification_result: Verification result from FaceMatcher
-            eye_result: Eye detection result (optional)
+            phone_detected: Whether phone was detected
             
         Returns:
             Frame with overlay
         """
         overlay = frame.copy()
+        y_offset = 25
+        line_height = 25
+        font_scale = 0.5
+        font_thickness = 1
         
-        # Determine status text and color
+        # Calculate FPS
+        fps_text = "FPS: --"
+        if hasattr(self, '_fps_start_time'):
+            elapsed = time.time() - self._fps_start_time
+            if elapsed > 0:
+                fps = self._fps_frame_count / elapsed
+                fps_text = f"FPS: {fps:.1f}"
+        
+        # 1. FPS Display
+        cv2.putText(
+            overlay,
+            fps_text,
+            (10, y_offset),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_scale,
+            (255, 255, 255),
+            font_thickness
+        )
+        y_offset += line_height
+        
+        # 2. Face Verification Status
         if num_faces > 1:
-            status_text = f"ALERT: {num_faces} PEOPLE DETECTED"
-            color = (0, 0, 255)  # Red
+            face_text = f"ALERT: {num_faces} PEOPLE"
+            face_color = (0, 0, 255)  # Red
         elif num_faces == 0:
-            status_text = "NO FACE DETECTED"
-            color = (0, 0, 255)  # Red
+            face_text = "NO FACE"
+            face_color = (0, 0, 255)  # Red
         elif verification_result:
             if verification_result.get('matched'):
-                status_text = "VERIFIED"
-                color = (0, 255, 0)  # Green
+                face_text = "VERIFIED"
+                face_color = (0, 255, 0)  # Green
                 confidence = verification_result.get('confidence', 0)
-                status_text += f" ({confidence:.1%})"
+                face_text += f" ({confidence:.0%})"
             else:
-                status_text = "UNVERIFIED"
-                color = (0, 165, 255)  # Orange
+                face_text = "UNVERIFIED"
+                face_color = (0, 165, 255)  # Orange
         else:
-            status_text = "CHECKING..."
-            color = (255, 255, 0)  # Yellow
+            face_text = "CHECKING..."
+            face_color = (255, 255, 0)  # Yellow
         
-        # Draw background rectangle
-        text_size = cv2.getTextSize(status_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
-        cv2.rectangle(overlay, (5, 5), (text_size[0] + 15, 40), (0, 0, 0), -1)
-        
-        # Draw status text
         cv2.putText(
             overlay,
-            status_text,
-            (10, 30),
+            face_text,
+            (10, y_offset),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            color,
-            2
+            font_scale,
+            face_color,
+            font_thickness
         )
+        y_offset += line_height
         
-        # Add eye status if available
-        if eye_result and 'eyes' in eye_result:
-            y_offset = 50
-            for eye_data in eye_result['eyes']:
-                eye_status = eye_data.get('risk_status', 'UNKNOWN')
-                eye_color = (0, 255, 0) if eye_status == 'SAFE' else (0, 0, 255) if eye_status == 'RISK' else (255, 165, 0)
-                eye_text = f"{eye_data.get('name', 'Eye')}: {eye_status}"
-                cv2.putText(
-                    overlay,
-                    eye_text,
-                    (10, y_offset),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    eye_color,
-                    1
-                )
-                y_offset += 20
-        
-        # Add frame counter
-        stats_text = f"Frame: {self.proctoring_results['total_frames_processed']}/{self.proctoring_results['total_frames_captured']}"
-        cv2.putText(
-            overlay,
-            stats_text,
-            (10, frame.shape[0] - 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (255, 255, 255),
-            1
-        )
+        # 3. Phone Detection Status
+        if phone_detected:
+            phone_text = "PHONE DETECTED!"
+            phone_color = (0, 0, 255)  # Red
+            cv2.putText(
+                overlay,
+                phone_text,
+                (10, y_offset),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                font_scale,
+                phone_color,
+                font_thickness
+            )
         
         return overlay
     
