@@ -249,7 +249,7 @@ if (loading) {
                     <span className="badge badge-info">Available</span>
                   </div>
                   <Link
-                    to={`/student/tests/${test.id}`}
+                    to={`/student/tests/check/${test.id}`}
                     className="btn-primary w-full flex items-center justify-center gap-2"
                   >
                     <PlayCircle className="w-4 h-4" />

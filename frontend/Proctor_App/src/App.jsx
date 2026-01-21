@@ -164,6 +164,7 @@ import ViewTest from './pages/ViewTest';
 import StudentLayout from './components/StudentLayout';
 import StudentDashboard from './pages/StudentDashboard';
 import StudentTests from './pages/StudentTests';
+import PreTestCheck from './pages/PreTestCheck';
 import TakeTest from './pages/TakeTest';
 import StudentResults from './pages/StudentResults';
 
@@ -265,18 +266,25 @@ function App() {
           </Route>
 
           {/* Student Routes */}
-          <Route
-            path="/student"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <StudentLayout />
-              </ProtectedRoute>
-            }
-          >
+            {/* Student Routes */}
+            <Route
+              path="/student"
+              element={
+                <ProtectedRoute requiredRole="student">
+                  <StudentLayout />
+                </ProtectedRoute>
+              }
+            >
             <Route index element={<Navigate to="/student/dashboard" replace />} />
             <Route path="dashboard" element={<StudentDashboard />} />
             <Route path="tests" element={<StudentTests />} />
+            
+            {/* Step 1: Redirect student to hardware check first */}
+             <Route path="tests/check/:testId" element={<PreTestCheck />} />
+            
+            {/* Step 2: The actual test page */}
             <Route path="tests/:testId" element={<TakeTest />} />
+            
             <Route path="results" element={<StudentResults />} />
           </Route>
 
