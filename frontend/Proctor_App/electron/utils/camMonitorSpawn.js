@@ -34,14 +34,14 @@ class CameraMonitorSpawner {
     
     this.scriptPath = config.scriptPath || path.join(
       appRoot,
-      'HD_ML_stuff',
+      'Mustan_ML_Stuff',
       'proctor_main_background.py'
     );
 
     // Participant data path
     this.participantImagePath = config.participantImagePath || path.join(
       appRoot,
-      'HD_ML_stuff',
+      'Mustan_ML_Stuff',
       'data',
       'participant.png'
     );
@@ -64,7 +64,7 @@ class CameraMonitorSpawner {
       : path.join(__dirname, '../../../..');
 
     // Check for virtual environment
-    const venvPath = path.join(appRoot, 'HD_ML_stuff', '.venv', 'Scripts', 'python.exe');
+    const venvPath = path.join(appRoot, 'Mustan_ML_Stuff', 'venv', 'Scripts', 'python.exe');
     if (fs.existsSync(venvPath)) {
       return venvPath;
     }

@@ -156,6 +156,9 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminTests from './pages/AdminTests';
 import CreateTest from './pages/CreateTest';
 import AdminResults from './pages/AdminResults';
+import EditTest from './pages/EditTest';
+import ViewTest from './pages/ViewTest';
+
 
 // Student
 import StudentLayout from './components/StudentLayout';
@@ -256,7 +259,8 @@ function App() {
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="tests" element={<AdminTests />} />
             <Route path="tests/create" element={<CreateTest />} />
-            <Route path="tests/:testId/edit" element={<CreateTest />} />
+            <Route path="tests/:testId" element={<ViewTest />} />
+            <Route path="tests/:testId/edit" element={<EditTest />} />
             <Route path="results" element={<AdminResults />} />
           </Route>
 

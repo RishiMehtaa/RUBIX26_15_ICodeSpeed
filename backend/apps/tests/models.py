@@ -321,16 +321,103 @@ class Test:
 
 
 
+# class TestSession:
+#     """TestSession model for tracking student test attempts"""
+#     collection = db['test_sessions']
+    
+#     @staticmethod
+#     def create(test_id, student_id, duration):
+#         """Create a new test session"""
+#         session_doc = {
+#             'test_id': ObjectId(test_id),
+#             'student_id': student_id,
+#             'start_time': datetime.utcnow(),
+#             'end_time': None,
+#             'duration': duration,
+#             'answers': {},
+#             'violations': [],
+#             'risk_score': 0,
+#             'status': 'in_progress',
+#             'submitted_at': None,
+#             'score': None,
+#             'created_at': datetime.utcnow(),
+#             'updated_at': datetime.utcnow()
+#         }
+        
+#         result = TestSession.collection.insert_one(session_doc)
+#         session_doc['_id'] = result.inserted_id
+#         return session_doc
+    
+#     @staticmethod
+#     def find_by_id(session_id):
+#         """Find session by ID"""
+#         return TestSession.collection.find_one({'_id': ObjectId(session_id)})
+    
+#     @staticmethod
+#     def find_active_session(test_id, student_id):
+#         """Find active session for student and test"""
+#         return TestSession.collection.find_one({
+#             'test_id': ObjectId(test_id),
+#             'student_id': student_id,
+#             'status': 'in_progress'
+#         })
+    
+#     @staticmethod
+#     def update(session_id, update_data):
+#         """Update session"""
+#         update_data['updated_at'] = datetime.utcnow()
+#         result = TestSession.collection.update_one(
+#             {'_id': ObjectId(session_id)},
+#             {'$set': update_data}
+#         )
+#         return result.modified_count > 0
+    
+#     @staticmethod
+#     def add_violation(session_id, violation):
+#         """Add a proctoring violation"""
+#         result = TestSession.collection.update_one(
+#             {'_id': ObjectId(session_id)},
+#             {
+#                 '$push': {'violations': violation},
+#                 '$inc': {'risk_score': violation.get('severity_score', 10)},
+#                 '$set': {'updated_at': datetime.utcnow()}
+#             }
+#         )
+#         return result.modified_count > 0
+    
+#     @staticmethod
+#     def to_dict(session_doc):
+#         """Convert session document to dictionary"""
+#         if not session_doc:
+#             return None
+        
+#         return {
+#             'id': str(session_doc['_id']),
+#             'test_id': str(session_doc['test_id']),
+#             'student_id': session_doc['student_id'],
+#             'start_time': session_doc['start_time'].isoformat() if session_doc.get('start_time') else None,
+#             'end_time': session_doc['end_time'].isoformat() if session_doc.get('end_time') else None,
+#             'duration': session_doc['duration'],
+#             'answers': session_doc.get('answers', {}),
+#             'violations': session_doc.get('violations', []),
+#             'risk_score': session_doc.get('risk_score', 0),
+#             'status': session_doc['status'],
+#             'submitted_at': session_doc['submitted_at'].isoformat() if session_doc.get('submitted_at') else None,
+#             'score': session_doc.get('score'),
+#         }
+
+# ...existing code...
+
 class TestSession:
     """TestSession model for tracking student test attempts"""
     collection = db['test_sessions']
     
     @staticmethod
     def create(test_id, student_id, duration):
-        """Create a new test session"""
+        """Create a new test session for a specific student"""
         session_doc = {
             'test_id': ObjectId(test_id),
-            'student_id': student_id,
+            'student_id': student_id,  # ✅ This makes it unique per student
             'start_time': datetime.utcnow(),
             'end_time': None,
             'duration': duration,
@@ -355,11 +442,28 @@ class TestSession:
     
     @staticmethod
     def find_active_session(test_id, student_id):
-        """Find active session for student and test"""
+        """Find active session for SPECIFIC student and test"""
+        return TestSession.collection.find_one({
+            'test_id': ObjectId(test_id),
+            'student_id': student_id,  # ✅ Student-specific query
+            'status': 'in_progress'
+        })
+    
+    @staticmethod
+    def find_student_session(test_id, student_id):
+        """Find any session (active or completed) for specific student and test"""
+        return TestSession.collection.find_one({
+            'test_id': ObjectId(test_id),
+            'student_id': student_id
+        })
+    
+    @staticmethod
+    def find_completed_session(test_id, student_id):
+        """Find completed session for specific student and test"""
         return TestSession.collection.find_one({
             'test_id': ObjectId(test_id),
             'student_id': student_id,
-            'status': 'in_progress'
+            'status': 'completed'
         })
     
     @staticmethod
@@ -391,17 +495,30 @@ class TestSession:
         if not session_doc:
             return None
         
+        # Helper function to handle date conversion
+        def format_date(date_value):
+            if not date_value:
+                return None
+            if isinstance(date_value, str):
+                return date_value
+            if hasattr(date_value, 'isoformat'):
+                return date_value.isoformat()
+            return None
+        
         return {
             'id': str(session_doc['_id']),
             'test_id': str(session_doc['test_id']),
             'student_id': session_doc['student_id'],
-            'start_time': session_doc['start_time'].isoformat() if session_doc.get('start_time') else None,
-            'end_time': session_doc['end_time'].isoformat() if session_doc.get('end_time') else None,
+            'start_time': format_date(session_doc.get('start_time')),
+            'end_time': format_date(session_doc.get('end_time')),
             'duration': session_doc['duration'],
             'answers': session_doc.get('answers', {}),
             'violations': session_doc.get('violations', []),
             'risk_score': session_doc.get('risk_score', 0),
             'status': session_doc['status'],
-            'submitted_at': session_doc['submitted_at'].isoformat() if session_doc.get('submitted_at') else None,
+            'submitted_at': format_date(session_doc.get('submitted_at')),
             'score': session_doc.get('score'),
+            'score_details': session_doc.get('score_details'),
         }
+
+# ...existing Test class code...

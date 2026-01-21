@@ -13,7 +13,7 @@ def main():
     
     # Configure the system for BACKGROUND MODE
     ProctorConfig.WINDOW_NAME = "AI Proctoring System - Background Mode"
-    ProctorConfig.FRAME_SKIP = 0  # Process every frame
+    ProctorConfig.FRAME_SKIP = 2  # Process every frame
     ProctorConfig.SHOW_FPS = True
     ProctorConfig.DISPLAY_FEED = False  # *** DISABLE DISPLAY - BACKGROUND MODE ***
     ProctorConfig.FACE_DETECT_ENABLE = True

@@ -174,6 +174,40 @@ def test_detail(request, test_id):
                 status=status.HTTP_403_FORBIDDEN
             )
         
+        # if request.method == 'PUT':
+        #     # Partial update - only update provided fields
+        #     update_data = {}
+            
+        #     if 'title' in request.data:
+        #         update_data['title'] = request.data['title']
+        #     if 'description' in request.data:
+        #         update_data['description'] = request.data['description']
+        #     if 'duration' in request.data:
+        #         update_data['duration'] = request.data['duration']
+        #     if 'total_marks' in request.data:
+        #         update_data['total_marks'] = request.data['total_marks']
+        #     if 'questions' in request.data:
+        #         update_data['questions'] = request.data['questions']
+        #         update_data['total_questions'] = len(request.data['questions'])
+        #     if 'start_date' in request.data:
+        #         update_data['start_date'] = request.data['start_date']
+        #     if 'end_date' in request.data:
+        #         update_data['end_date'] = request.data['end_date']
+            
+        #     if not update_data:
+        #         return Response(
+        #             {'error': 'No fields to update'},
+        #             status=status.HTTP_400_BAD_REQUEST
+        #         )
+            
+        #     Test.update(test_id, update_data)
+        #     updated_test = Test.find_by_id(test_id)
+            
+        #     return Response(
+        #         Test.to_dict(updated_test),
+        #         status=status.HTTP_200_OK
+        #     )
+
         if request.method == 'PUT':
             # Partial update - only update provided fields
             update_data = {}
@@ -189,10 +223,41 @@ def test_detail(request, test_id):
             if 'questions' in request.data:
                 update_data['questions'] = request.data['questions']
                 update_data['total_questions'] = len(request.data['questions'])
+            
+            # ✅ FIXED: Parse date strings to datetime objects
             if 'start_date' in request.data:
-                update_data['start_date'] = request.data['start_date']
+                start_date = request.data['start_date']
+                if start_date:
+                    try:
+                        # Convert ISO string to datetime object
+                        if isinstance(start_date, str):
+                            update_data['start_date'] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                        else:
+                            update_data['start_date'] = start_date
+                    except ValueError:
+                        return Response(
+                            {'error': 'Invalid start_date format'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                else:
+                    update_data['start_date'] = None
+            
             if 'end_date' in request.data:
-                update_data['end_date'] = request.data['end_date']
+                end_date = request.data['end_date']
+                if end_date:
+                    try:
+                        # Convert ISO string to datetime object
+                        if isinstance(end_date, str):
+                            update_data['end_date'] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                        else:
+                            update_data['end_date'] = end_date
+                    except ValueError:
+                        return Response(
+                            {'error': 'Invalid end_date format'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                else:
+                    update_data['end_date'] = None
             
             if not update_data:
                 return Response(
@@ -207,6 +272,7 @@ def test_detail(request, test_id):
                 Test.to_dict(updated_test),
                 status=status.HTTP_200_OK
             )
+
         
         elif request.method == 'DELETE':
             Test.delete(test_id)
@@ -324,7 +390,9 @@ def start_test(request, test_id):
         
         # STEP 3: Check if student already has an active session
         # This prevents students from starting the same test multiple times
-        student_id = request.user.id  # Get student ID from JWT token
+        # student_id = request.user.id  # Get student ID from JWT token
+        # existing_session = TestSession.find_active_session(test_id, student_id)
+        student_id = str(request.user.id)
         existing_session = TestSession.find_active_session(test_id, student_id)
         
         if existing_session:
@@ -332,6 +400,17 @@ def start_test(request, test_id):
                 {
                     'error': 'You already have an active session for this test',
                     'session': TestSession.to_dict(existing_session)
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        completed_session = TestSession.find_completed_session(test_id, student_id)
+        
+        if completed_session:
+            return Response(
+                {
+                    'error': 'You have already completed this test',
+                    'session': TestSession.to_dict(completed_session)
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -357,6 +436,9 @@ def start_test(request, test_id):
         )
     
     except Exception as e:
+        print(f"Error in start_test: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
         # Catch any unexpected errors
         return Response(
             {'error': str(e)},
@@ -401,10 +483,17 @@ def submit_test(request, test_id):
         violations = validated_data.get('violations', [])
         risk_score = validated_data.get('risk_score', 0)
         
-        # Get student ID from JWT
-        student_id = request.user.id
+        # # Get student ID from JWT
+        # student_id = request.user.id
         
-        # Find active test session
+        # # Find active test session
+        # session_doc = TestSession.find_active_session(test_id, student_id)
+
+        
+        # ✅ FIXED: Get student ID as string (for consistency)
+        student_id = str(request.user.id)
+        
+        # ✅ FIXED: Find active session for THIS SPECIFIC student
         session_doc = TestSession.find_active_session(test_id, student_id)
         
         if not session_doc:
@@ -660,8 +749,12 @@ def get_student_results(request, student_id):
     
     try:
         # Get all completed sessions for this student
+        # sessions = list(TestSession.collection.find({
+        #     'student_id': student_id,
+        #     'status': 'completed'
+        # }))
         sessions = list(TestSession.collection.find({
-            'student_id': student_id,
+            'student_id': student_id,  # ✅ Filter by student_id
             'status': 'completed'
         }))
         
@@ -687,6 +780,9 @@ def get_student_results(request, student_id):
         return Response(results, status=status.HTTP_200_OK)
     
     except Exception as e:
+        print(f"Error in get_student_results: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
         return Response(
             {'error': str(e)},
             status=status.HTTP_400_BAD_REQUEST
@@ -759,11 +855,14 @@ def get_available_tests(request):
         for test in tests:
             test_id = str(test['_id'])
             
-            # Check if student has a session for this test
-            session = TestSession.collection.find_one({
-                'test_id': test['_id'],
-                'student_id': student_id
-            })
+            # # Check if student has a session for this test
+            # session = TestSession.collection.find_one({
+            #     'test_id': test['_id'],
+            #     'student_id': student_id
+            # })
+
+            # ✅ FIXED: Check if THIS SPECIFIC STUDENT has a session for this test
+            session = TestSession.find_student_session(test_id, student_id)
             
             # Determine status and score
             if session:

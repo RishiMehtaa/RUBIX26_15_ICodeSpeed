@@ -1,0 +1,549 @@
+{
+  "info": {
+    "_postman_id": "8305c19e-12e2-4d5c-ab8f-388dfc54db7a",
+    "name": "RUBIX-Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "44883613"
+  },
+  "item": [
+    {
+      "name": "Signup",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"name\": \"abcd\",\r\n  \"email\": \"abcd@example.com\",\r\n  \"password\": \"password123\",\r\n  \"role\": \"admin\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/auth/signup",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "auth",
+            "signup"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"email\": \"messi@gmail.com\",\r\n  \"password\": \"12345678\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/auth/login",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Logout",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY5MDA5ODg5LCJpYXQiOjE3Njg5MjM0ODksImp0aSI6ImU3NDFjYmEwY2VjNzQ3YjdiNjhiNGZmYzQ1ZjE0NzM2IiwidXNlcl9pZCI6IjY5NmY4NDE1NzIwOGJjYTc3OGQzYjU2MiIsImVtYWlsIjoia3Jpc2hAZ21haWwuY29tIiwicm9sZSI6InN0dWRlbnQifQ.ZWZ2IFZgQle6WlILlHvCUJf--XzhDlvjPIVoDjAMRbY",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/api/auth/logout",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "auth",
+            "logout"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create test",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY5MDExMDQ0LCJpYXQiOjE3Njg5MjQ2NDQsImp0aSI6IjA5Yzg2ZjZiMDk4MDRkNjM5ZjExOTBkOGQwODg0ZDY3IiwidXNlcl9pZCI6IjY5NmZhM2Y4NmFlMmZhNGQxZWM3YzE0ZSIsImVtYWlsIjoicm9uYWxkb0BnbWFpbC5jb20iLCJyb2xlIjoiYWRtaW4ifQ.cxBwQNbqKuqpTChja1yLgvIWfnZncIjeG9Mlj79IwEA",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"title\": \"Python Programming Test 4\",\r\n  \"description\": \"Basic Python concepts and syntax\",\r\n  \"duration\": 90,\r\n  \"total_marks\": 100,\r\n  \"start_date\": \"2026-01-22T10:00:00Z\",\r\n  \"end_date\": \"2026-01-25T18:00:00Z\",\r\n  \"questions\": [\r\n    {\r\n      \"id\": \"q1\",\r\n      \"question\": \"What is the output of print(2 ** 3)?\",\r\n      \"type\": \"multiple-choice\",\r\n      \"options\": [\"6\", \"8\", \"9\", \"5\"],\r\n      \"correct_answer\": \"1\",\r\n      \"marks\": 10\r\n    },\r\n    {\r\n      \"id\": \"q2\",\r\n      \"question\": \"Explain the difference between list and tuple in Python.\",\r\n      \"type\": \"text\",\r\n      \"correct_answer\": \"Lists are mutable, tuples are immutable\",\r\n      \"marks\": 20\r\n    },\r\n    {\r\n      \"id\": \"q3\",\r\n      \"question\": \"Python is an interpreted language.\",\r\n      \"type\": \"true-false\",\r\n      \"options\": [\"True\", \"False\"],\r\n      \"correct_answer\": \"0\",\r\n      \"marks\": 5\r\n    }\r\n  ]\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/tests/",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "tests",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get tests (admin)",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY4OTE2MTg2LCJpYXQiOjE3Njg4Mjk3ODYsImp0aSI6ImYwMTZkMDljZjljZTQ0ZWY5NmFmMDJmOTQ1ZDNkMzhiIiwidXNlcl9pZCI6IjY5NmUyYWJjZmY3ZDAzM2IzOTExMTllZiIsImVtYWlsIjoicmlzaGlAZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4ifQ.IC9TDI533Hy058q7swsMTWX_6Ns2nEbl08C2oubiS6o",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/tests/",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "tests",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get tests by id",
+      "request": {
+        "method": "GET",
+        "header": []
+      },
+      "response": []
+    },
+    {
+      "name": "Update test by id",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY4OTE2MTg2LCJpYXQiOjE3Njg4Mjk3ODYsImp0aSI6ImYwMTZkMDljZjljZTQ0ZWY5NmFmMDJmOTQ1ZDNkMzhiIiwidXNlcl9pZCI6IjY5NmUyYWJjZmY3ZDAzM2IzOTExMTllZiIsImVtYWlsIjoicmlzaGlAZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4ifQ.IC9TDI533Hy058q7swsMTWX_6Ns2nEbl08C2oubiS6o",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"title\": \"Updated Test Title\",\r\n  \"description\": \"Updated description\",\r\n  \"duration\": 90\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/tests/696e33baa43f87d25183fdd8",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "tests",
+            "696e33baa43f87d25183fdd8"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Delete test by id",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY4OTE3Nzk1LCJpYXQiOjE3Njg4MzEzOTUsImp0aSI6IjAxMTM2ZDc3MmVlMDQ2MDNiMmMwOTMxMGE0ZmY5MWUzIiwidXNlcl9pZCI6IjY5NmUyYWJjZmY3ZDAzM2IzOTExMTllZiIsImVtYWlsIjoicmlzaGlAZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4ifQ.hjeTYMMGZHRnXshoCi2E1-8s1bcyKPVkse9HiOBuM_s",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/api/tests/696e33baa43f87d25183fdd8",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "tests",
+            "696e33baa43f87d25183fdd8"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Publish a test",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY5MDExMDQ0LCJpYXQiOjE3Njg5MjQ2NDQsImp0aSI6IjA5Yzg2ZjZiMDk4MDRkNjM5ZjExOTBkOGQwODg0ZDY3IiwidXNlcl9pZCI6IjY5NmZhM2Y4NmFlMmZhNGQxZWM3YzE0ZSIsImVtYWlsIjoicm9uYWxkb0BnbWFpbC5jb20iLCJyb2xlIjoiYWRtaW4ifQ.cxBwQNbqKuqpTChja1yLgvIWfnZncIjeG9Mlj79IwEA",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/tests/696fb210d5d356c6f074d812/publish",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "tests",
+            "696fb210d5d356c6f074d812",
+            "publish"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get a test (student)",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY4OTE3MjY3LCJpYXQiOjE3Njg4MzA4NjcsImp0aSI6ImUyMTU5NGEzM2NiNDRjNjY5OTJlOGViYzAyYzdlYTA4IiwidXNlcl9pZCI6IjY5NmUwNWQ3YTFhNzNlMjRjZTBjZWU5MyIsImVtYWlsIjoiam9obkBleGFtcGxlLmNvbSIsInJvbGUiOiJzdHVkZW50In0.QzU6NU01On2oALbBwIVY5diAa3AIIA1On4LWO2_j18E",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/api/student/tests",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "student",
+            "tests"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "start test",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY5MDE2NTEzLCJpYXQiOjE3Njg5MzAxMTMsImp0aSI6Ijg0MTc1N2M0YzE3ZTQ0Nzk5NzFjOTIxMzRkYWRlNWY0IiwidXNlcl9pZCI6IjY5NmZhMWExNmFlMmZhNGQxZWM3YzE0ZCIsImVtYWlsIjoibWVzc2lAZ21haWwuY29tIiwicm9sZSI6InN0dWRlbnQifQ.2KzXZCJpvx5jwrGOtIS3JrUSJBxyKWHCGGpJxy8pUCU",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/api/student/tests/696fb210d5d356c6f074d812/start",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "student",
+            "tests",
+            "696fb210d5d356c6f074d812",
+            "start"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Submit test",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY4OTE3Nzk1LCJpYXQiOjE3Njg4MzEzOTUsImp0aSI6IjAxMTM2ZDc3MmVlMDQ2MDNiMmMwOTMxMGE0ZmY5MWUzIiwidXNlcl9pZCI6IjY5NmUyYWJjZmY3ZDAzM2IzOTExMTllZiIsImVtYWlsIjoicmlzaGlAZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4ifQ.hjeTYMMGZHRnXshoCi2E1-8s1bcyKPVkse9HiOBuM_s",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"answers\": {\r\n    \"q1\": \"0\",\r\n    \"q2\": \"Supervised learning uses labeled data while unsupervised learning works with unlabeled data.\"\r\n  },\r\n  \"violations\": [\r\n    {\r\n      \"type\": \"tab-switch\",\r\n      \"timestamp\": \"2026-01-19T16:45:00Z\",\r\n      \"severity\": \"medium\"\r\n    }\r\n  ],\r\n  \"risk_score\": 15\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/student/tests/696e336fa43f87d25183fdd7/submit",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "student",
+            "tests",
+            "696e336fa43f87d25183fdd7",
+            "submit"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "get results (admin)",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY5MDIxODI3LCJpYXQiOjE3Njg5MzU0MjcsImp0aSI6IjRhMWU4MWY3OTQyMDRhNmM5YWYzMjMxZjMzMTUzMTZhIiwidXNlcl9pZCI6IjY5NmZhM2Y4NmFlMmZhNGQxZWM3YzE0ZSIsImVtYWlsIjoicm9uYWxkb0BnbWFpbC5jb20iLCJyb2xlIjoiYWRtaW4ifQ.OjvG3pFkZ0KFZaBPz3YAa0XnEYHXTlfQMa5CDDqTjSE",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/api/results/",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "results",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "get result by test_id",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY5MDIxODI3LCJpYXQiOjE3Njg5MzU0MjcsImp0aSI6IjRhMWU4MWY3OTQyMDRhNmM5YWYzMjMxZjMzMTUzMTZhIiwidXNlcl9pZCI6IjY5NmZhM2Y4NmFlMmZhNGQxZWM3YzE0ZSIsImVtYWlsIjoicm9uYWxkb0BnbWFpbC5jb20iLCJyb2xlIjoiYWRtaW4ifQ.OjvG3pFkZ0KFZaBPz3YAa0XnEYHXTlfQMa5CDDqTjSE",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://127.0.0.1:8000/api/results/test/696fb210d5d356c6f074d812/",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "results",
+            "test",
+            "696fb210d5d356c6f074d812",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "get result by student_id",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY5MDIyNjQyLCJpYXQiOjE3Njg5MzYyNDIsImp0aSI6ImNlZjkzZGZhNDM2YzQ1N2NiYmJhMTNmYmNiY2QyYTFmIiwidXNlcl9pZCI6IjY5NmZhMWExNmFlMmZhNGQxZWM3YzE0ZCIsImVtYWlsIjoibWVzc2lAZ21haWwuY29tIiwicm9sZSI6InN0dWRlbnQifQ.w3NwAYwMY03np6aquGp8dLKWBeECNKLybsmYO-kC6s0",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://127.0.0.1:8000/api/results/student/696fa1a16ae2fa4d1ec7c14d/",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "results",
+            "student",
+            "696fa1a16ae2fa4d1ec7c14d",
+            ""
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
