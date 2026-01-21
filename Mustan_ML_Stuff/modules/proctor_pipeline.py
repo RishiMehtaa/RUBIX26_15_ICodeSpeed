@@ -1,15 +1,18 @@
 """
 Proctor Module
 Main proctoring pipeline that orchestrates multiple detection modules
+Supports shared memory buffer for zero-copy frame sharing with frontend
 """
 
 import logging
 import cv2
 import time
+import os
 from .camera_pipeline import CameraPipeline
 from .base_detector import BaseDetector
 from .proctor_logger import ProctorLogger
 from .alert_communicator import AlertCommunicator
+from .shared_frame_buffer import SharedFrameBuffer
 from .face_detector import FaceDetector
 from .face_matcher import FaceMatcher
 from .eye_detector import EyeMovementDetector
@@ -20,6 +23,7 @@ class ProctorPipeline(CameraPipeline):
     """
     Proctoring pipeline that inherits from CameraPipeline.
     Automatically loads and manages detector modules based on configuration.
+    Supports WebSocket streaming for frontend communication.
     """
     
     def __init__(self, config=None, frame_skip=2, session_id=None):
@@ -55,6 +59,24 @@ class ProctorPipeline(CameraPipeline):
             write_interval=0.1,  # Write every 100ms max
             cooldown_duration=1.0  # 1 second cooldown per alert type
         )
+
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.info(f"Proctoring pipeline initialized with frame_skip={frame_skip}")
+
+        # Shared memory buffer for frontend frame streaming
+        self.frame_buffer = None
+        if config.SHARED_MEMORY_ENABLED:
+            try:
+                # Get absolute path to mmap file
+                script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                mmap_path = os.path.join(script_dir, config.SHARED_MEMORY_PATH)
+                
+                self.logger.info(f"Initializing shared frame buffer at: {mmap_path}")
+                self.frame_buffer = SharedFrameBuffer(file_path=mmap_path, create=True)
+                self.logger.info("Shared frame buffer initialized successfully")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize shared frame buffer: {e}")
+                self.frame_buffer = None
         
         # Proctoring state
         self.proctoring_results = {
@@ -64,8 +86,6 @@ class ProctorPipeline(CameraPipeline):
             "alerts": []
         }
         
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.info(f"Proctoring pipeline initialized with frame_skip={frame_skip}")
         
         # Auto-load detectors based on configuration
         self._initialize_detectors()
@@ -175,6 +195,13 @@ class ProctorPipeline(CameraPipeline):
         # Summary
         loaded_count = len([d for d in [self.face_detector, self.face_matcher, self.eye_detector, self.phone_detector] if d is not None])
         self.logger.info(f"Detector initialization complete: {loaded_count} detector(s) loaded")
+        
+    
+    def initialize(self):
+        """Override to update WebSocket status after camera init"""
+        result = super().initialize()
+        
+        return result
     
     def list_detectors(self):
         """
@@ -390,6 +417,13 @@ class ProctorPipeline(CameraPipeline):
         
         # Flush alert state to file if needed (debounced)
         self.alert_comm.flush_if_needed()
+        
+        # Write frame to shared memory buffer if enabled
+        if self.frame_buffer:
+            try:
+                self.frame_buffer.write_frame(annotated_frame)
+            except Exception as e:
+                self.logger.error(f"Error writing frame to shared buffer: {e}")
     
         # Only draw annotations if DISPLAY_FEED is enabled
         if getattr(self.config, 'DISPLAY_FEED', True):
@@ -798,6 +832,17 @@ class ProctorPipeline(CameraPipeline):
         """Cleanup resources (override from CameraPipeline)"""
         print("\n[DEBUG] === ENTERING ProctorPipeline.cleanup() ===")
         print("[DEBUG] Step 0: Starting cleanup")
+        
+        # Close shared memory buffer
+        try:
+            if hasattr(self, 'frame_buffer') and self.frame_buffer:
+                print("[DEBUG] Step 0.5: Closing shared memory buffer")
+                self.frame_buffer.cleanup()
+                print("[DEBUG] Step 0.6: Shared memory buffer closed")
+                self.logger.info("Shared memory buffer closed and cleaned up")
+        except Exception as e:
+            print(f"[DEBUG] ERROR closing shared memory buffer: {e}")
+            self.logger.error(f"Error closing shared memory buffer: {e}")
         
         try:
             print("[DEBUG] Step 1: Generating final report")

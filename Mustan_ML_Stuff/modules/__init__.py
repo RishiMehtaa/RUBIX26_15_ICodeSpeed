@@ -13,6 +13,7 @@ from .proctor_logger import ProctorLogger
 from .alert_communicator import AlertCommunicator
 from .camera_pipeline import CameraPipeline
 from .proctor_pipeline import ProctorPipeline
+from .shared_frame_buffer import SharedFrameBuffer
 
 __all__ = [
     'CameraCapture',
@@ -25,5 +26,6 @@ __all__ = [
     'ProctorLogger',
     'AlertCommunicator',
     'CameraPipeline',
-    'ProctorPipeline'
+    'ProctorPipeline',
+    'SharedFrameBuffer'
 ]
