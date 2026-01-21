@@ -31,3 +31,9 @@ logs/
 
 # Image data
 **/data/
+
+# Test
+test.py
+
+# Builds
+**/Build/
