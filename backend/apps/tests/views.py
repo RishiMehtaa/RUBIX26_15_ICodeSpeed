@@ -518,7 +518,7 @@ def submit_test(request, test_id):
             # Build absolute path to log file - go up one level from BASE_DIR
             log_file_path = os.path.join(
                 os.path.dirname(settings.BASE_DIR),  # Go up one level from backend
-                'HD_ML_stuff',
+                'Mustan_ML_Stuff',
                 'logs',
                 'proctoring',
                 'test.log'

@@ -409,7 +409,7 @@ const StudentTests = () => {
                 <div className="flex lg:flex-col gap-2">
                   {canStartTest(test) ? (
                     <Link
-                      to={`/student/tests/${test.id}`}
+                      to={`/student/tests/check/${test.id}`}
                       className="btn-primary flex items-center gap-2 justify-center"
                     >
                       <PlayCircle className="w-4 h-4" />

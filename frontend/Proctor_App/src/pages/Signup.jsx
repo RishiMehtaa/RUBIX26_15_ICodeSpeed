@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Eye, EyeOff, ShieldCheck, Lock, Mail, User } from 'lucide-react';
+import { Eye, EyeOff, ShieldCheck, Lock, Mail, User, Upload } from 'lucide-react';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -15,8 +15,69 @@ const Signup = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [idImage, setIdImage] = useState(null);
+  const [idImagePreview, setIdImagePreview] = useState(null);
   const { signup } = useAuth();
   const navigate = useNavigate();
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError('Please upload a valid image file');
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Image size must be less than 5MB');
+        return;
+      }
+      
+      setIdImage(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setIdImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const saveIdImageLocally = async (file, userId) => {
+    try {
+      const storagePath = import.meta.env.VITE_STUDENT_ID_STORAGE_PATH || 'public/uploads/student-ids';
+      const timestamp = Date.now();
+      const fileName = `${userId}_${timestamp}_${file.name}`;
+      const filePath = `${storagePath}/${fileName}`;
+
+      // Convert file to base64 for local storage
+      const reader = new FileReader();
+      return new Promise((resolve, reject) => {
+        reader.onload = () => {
+          // Store file info and base64 data
+          const imageData = {
+            fileName,
+            filePath,
+            base64: reader.result,
+            timestamp
+          };
+          // Save to localStorage (for demo purposes)
+          // In production, you'd send this to backend or use File System API
+          const existingImages = JSON.parse(localStorage.getItem('studentIdImages') || '{}');
+          existingImages[userId] = imageData;
+          localStorage.setItem('studentIdImages', JSON.stringify(existingImages));
+          
+          resolve(filePath);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    } catch (error) {
+      console.error('Error saving ID image:', error);
+      throw error;
+    }
+  };
 
   const handleChange = (e) => {
     setFormData({
@@ -24,6 +85,40 @@ const Signup = () => {
       [e.target.name]: e.target.value
     });
   };
+
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   setError('');
+
+  //   if (formData.password !== formData.confirmPassword) {
+  //     setError('Passwords do not match');
+  //     return;
+  //   }
+
+  //   if (formData.password.length < 6) {
+  //     setError('Password must be at least 6 characters long');
+  //     return;
+  //   }
+
+  //   setLoading(true);
+
+  //   try {
+  //     const result = await signup(formData.name, formData.email, formData.password, formData.role);
+  //     if (result.success) {
+  //       if (result.user.role === 'admin') {
+  //         navigate('/admin/dashboard');
+  //       } else {
+  //         navigate('/student/dashboard');
+  //       }
+  //     } else {
+  //       setError(result.error || 'Signup failed');
+  //     }
+  //   } catch (err) {
+  //     setError('An error occurred during signup');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,11 +134,22 @@ const Signup = () => {
       return;
     }
 
+    if (formData.role === 'student' && !idImage) {
+      setError('Please upload your student ID image');
+      return;
+    }
+
     setLoading(true);
 
-    try {
+     try {
       const result = await signup(formData.name, formData.email, formData.password, formData.role);
       if (result.success) {
+        // Save ID image locally if signup successful and user is student
+        if (formData.role === 'student' && idImage) {
+          const imagePath = await saveIdImageLocally(idImage, result.user.id);
+          console.log('ID image saved at:', imagePath);
+        }
+
         if (result.user.role === 'admin') {
           navigate('/admin/dashboard');
         } else {
@@ -58,6 +164,7 @@ const Signup = () => {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-white flex">
@@ -189,7 +296,7 @@ const Signup = () => {
               </select>
             </div>
 
-            {formData.role === 'student' && (
+            {/* {formData.role === 'student' && (
                 <div>
                   <label className="block text-sm font-medium text-dark-700 mb-2">
                     Upload Student ID Image
@@ -207,7 +314,46 @@ const Signup = () => {
                     </p>
                   </div>
                 </div>
-              )}
+              )} */}
+
+               {formData.role === 'student' && (
+              <div>
+                <label className="block text-sm font-medium text-dark-700 mb-2">
+                  Student ID Image *
+                </label>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                    id="id-upload"
+                    required
+                  />
+                  <label
+                    htmlFor="id-upload"
+                    className="input-field cursor-pointer flex items-center justify-center gap-2 py-3 hover:bg-dark-50 transition-colors"
+                  >
+                    <Upload className="w-5 h-5 text-dark-400" />
+                    <span className="text-dark-600">
+                      {idImage ? idImage.name : 'Choose ID image'}
+                    </span>
+                  </label>
+                  {idImagePreview && (
+                    <div className="mt-3 border-2 border-dark-200 rounded-lg p-2">
+                      <img
+                        src={idImagePreview}
+                        alt="ID Preview"
+                        className="w-full h-48 object-contain rounded"
+                      />
+                    </div>
+                  )}
+                  <p className="mt-1 text-xs text-dark-500">
+                    Upload a clear image of your college/government ID (Max 5MB)
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-dark-700 mb-2">
